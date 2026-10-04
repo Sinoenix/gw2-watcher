@@ -1,0 +1,42 @@
+name: Watch leaderboard
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load saved history
+        run: |
+          mkdir -p data
+          if git fetch -q --depth=1 origin data; then
+            for f in $(git ls-tree --name-only FETCH_HEAD); do git show "FETCH_HEAD:$f" > "data/$f"; done
+          fi
+
+      - name: Check NA and EU
+        run: python3 ci_check.py --dir data --regions na,eu
+
+      - name: Save history
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd data
+          git init -q -b data
+          git config user.name "gw2-watcher-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "update $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q --force "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" data

@@ -1,0 +1,1820 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GW2 Leaderboard Watcher</title>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink-2:#52514e;--muted:#898781;
+  --grid:#e1e0d9;--axis:#c3c2b7;--ring:rgba(11,11,11,.10);
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;
+  --good:#006300;--bad:#d03b3b;--warn:#8a5a00;--chip:#f0efec;--shade:rgba(11,11,11,.35);
+  --accent-wash:rgba(42,120,214,.10);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --page:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink-2:#c3c2b7;--muted:#898781;
+    --grid:#2c2c2a;--axis:#383835;--ring:rgba(255,255,255,.10);
+    --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;
+    --good:#0ca30c;--bad:#e66767;--warn:#fab219;--chip:#2c2c2a;--shade:rgba(0,0,0,.6);
+    --accent-wash:rgba(57,135,229,.16);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink-2:#c3c2b7;--muted:#898781;
+  --grid:#2c2c2a;--axis:#383835;--ring:rgba(255,255,255,.10);
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;
+  --good:#0ca30c;--bad:#e66767;--warn:#fab219;--chip:#2c2c2a;--shade:rgba(0,0,0,.6);
+  --accent-wash:rgba(57,135,229,.16);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+h1{font-size:20px;margin:0;font-weight:650}
+h2{font-size:15px;margin:0 0 10px;font-weight:650}
+h3{font-size:13px;margin:0 0 8px;font-weight:650;color:var(--ink-2)}
+.sub{color:var(--ink-2);font-size:13px}
+.stale{color:var(--bad);font-weight:600}
+.lang{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2)}
+select,input,textarea,button{font:inherit;color:var(--ink)}
+select,input[type=search],input[type=number],input[type=text],textarea{background:var(--page);border:1px solid var(--ring);border-radius:8px;padding:6px 9px;min-width:0;max-width:100%}
+textarea{width:100%;min-height:62px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:12px}
+button{background:var(--chip);border:1px solid var(--ring);border-radius:8px;padding:6px 12px;cursor:pointer}
+button.primary{background:var(--s1);border-color:var(--s1);color:#fff}
+button.win{color:var(--good);font-weight:650}button.loss{color:var(--bad);font-weight:650}
+button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--axis);margin-bottom:12px;overflow-x:auto;scrollbar-width:thin}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--ink-2);white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--s1);font-weight:650}
+.tab{display:none}.tab.on{display:block}
+.section{margin-top:12px}
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:14px 16px;min-width:0}
+.tile .k{color:var(--ink-2);font-size:12px}
+.tile .v{font-size:26px;font-weight:650;margin-top:2px}
+.tile .d{color:var(--muted);font-size:12px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note{color:var(--muted);font-size:12px;margin-top:8px}
+.insight{color:var(--ink-2);font-size:13px;margin:0 0 10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 6px;font-size:12px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.chartbox{position:relative;min-height:60px}
+svg{display:block;width:100%}
+.tip{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--ring);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;min-width:150px;z-index:2}
+.tip b{display:block;margin-bottom:4px;color:var(--ink-2);font-weight:600}
+.tip div{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.tip i{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:12px}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--grid);font-size:13px}
+.list li:first-child{border-top:0}
+.list .v{font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+.feed{list-style:none;margin:0;padding:0;max-height:520px;overflow:auto}
+.feed li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--grid);font-size:13px}
+.feed li:first-child{border-top:0}
+.tag{font-size:11px;font-weight:650;padding:2px 7px;border-radius:999px;background:var(--chip);color:var(--ink-2);white-space:nowrap}
+.tag.w{color:var(--good)}.tag.l{color:var(--bad)}
+.n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.m{color:var(--muted);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.up{color:var(--good)}.down{color:var(--bad)}
+a{color:var(--s1)}
+a.plink{color:inherit;text-decoration:none;border-bottom:1px dotted var(--axis)}
+a.plink:hover{border-bottom-color:var(--ink-2)}
+.tablebar{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap}
+input[type=search]{width:220px}
+.tscroll{max-height:520px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;background:var(--surface);text-align:left;color:var(--ink-2);font-weight:600;font-size:12px;padding:6px 8px;border-bottom:1px solid var(--axis)}
+td{padding:6px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+td.wrapcell{white-space:normal}
+td.num,th.num{text-align:right}
+tr.watched td{font-weight:650}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px}
+.empty{color:var(--muted);padding:12px 0}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+.pill{font-size:11px;font-weight:650;padding:2px 6px;border-radius:6px;background:var(--chip)}
+.pill.w{color:var(--good)}.pill.l{color:var(--bad)}
+code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12px;word-break:break-all}
+ol.steps{margin:6px 0 0;padding-left:20px;color:var(--ink-2)}
+ol.steps li{margin:4px 0}
+.heatlegend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:8px;flex-wrap:wrap}
+.heatlegend .ramp{width:90px;height:10px;border-radius:3px;background:linear-gradient(90deg,color-mix(in srgb,var(--s1) 14%,var(--surface)),var(--s1))}
+.heatlegend .na{width:12px;height:10px;border-radius:2px;background:var(--chip);display:inline-block}
+.bar{height:8px;border-radius:4px;background:var(--chip);overflow:hidden;margin:6px 0 2px}
+.bar > i{display:block;height:100%;background:var(--s1);border-radius:4px}
+.banner{border:1px solid var(--ring);border-left:4px solid var(--bad);background:var(--surface);border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.banner b{color:var(--bad)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2)}
+.slots{display:grid;gap:6px}
+.slot{display:grid;grid-template-columns:22px minmax(0,1.4fr) minmax(0,1fr);gap:6px;align-items:center}
+.slot .idx{color:var(--muted);font-size:12px;text-align:right}
+.slot select{width:100%}
+.reco{border:1px solid var(--ring);border-radius:10px;padding:10px 12px;margin-top:8px}
+.reco.best{border-color:var(--s1);background:var(--accent-wash)}
+.reco .h{display:flex;justify-content:space-between;gap:8px;font-weight:650}
+.reco ul{margin:6px 0 0;padding-left:18px;color:var(--ink-2);font-size:13px}
+details{border-top:1px solid var(--grid);padding:8px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:600}
+details p{margin:6px 0 0;color:var(--ink-2)}
+dl.gloss{display:grid;grid-template-columns:minmax(110px,max-content) 1fr;gap:6px 14px;margin:0}
+dl.gloss dt{font-weight:650}dl.gloss dd{margin:0;color:var(--ink-2)}
+.shade{position:fixed;inset:0;background:var(--shade);display:none;z-index:10}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--surface);border-left:1px solid var(--ring);z-index:11;overflow:auto;padding:18px 18px 30px;display:none}
+.drawer.open,.shade.open{display:block}
+.drawer .close{float:right}
+.drawer .tiles{grid-template-columns:repeat(2,minmax(0,1fr));margin:12px 0}
+.drawer .tile .v{font-size:22px}
+footer{color:var(--muted);font-size:12px;margin-top:16px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:820px){
+  .tiles,.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cols,.grid2,.grid3{grid-template-columns:minmax(0,1fr)}
+  .feed li{grid-template-columns:auto minmax(0,1fr)}
+  .feed .m{grid-column:1/-1;white-space:normal}
+  dl.gloss{grid-template-columns:1fr}
+  dl.gloss dd{margin-bottom:6px}
+}
+
+.ctl{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.keyform{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.keyform input{flex:1 1 220px;min-width:0;font:inherit;padding:6px 10px;border:1px solid var(--ring);border-radius:8px;background:var(--surface);color:var(--ink)}
+.keyform button{flex:0 0 auto}
+.msg{min-height:1.4em;margin-top:6px;font-size:13px}
+.msg.bad{color:var(--bad)}.msg.good{color:var(--good)}
+button.small{padding:3px 10px;font-size:12px}
+button:disabled{opacity:.55;cursor:not-allowed}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>GW2 Leaderboard Watcher</h1>
+      <div class="sub" id="meta"></div>
+    </div>
+    <div class="ctl"><label class="lang"><span data-t="language">Language</span>
+      <select id="lang" aria-label="Language">
+        <option value="en">English</option><option value="es">Español</option><option value="pt">Português</option>
+      </select>
+    </label>
+    <label class="lang"><span data-t="regionLabel">Region</span>
+      <select id="region" aria-label="Region"><option value="na">NA</option><option value="eu">EU</option></select>
+    </label>
+    </div>
+  </header>
+  <div id="tiltBanner"></div>
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <main>
+    <section class="tab" id="tab-overview">
+      <div class="tiles" id="tiles"></div>
+      <section class="card section">
+        <h2 id="chartTitle"></h2>
+        <div class="legend" id="legend"></div>
+        <div class="chartbox" id="chartbox"></div>
+      </section>
+      <section class="section grid4" id="hot"></section>
+      <section class="card section">
+        <h2 data-t="cutoffsTitle"></h2>
+        <p class="insight" id="cutInsight"></p>
+        <div class="legend" id="cutLegend"></div>
+        <div class="chartbox" id="cutbox"></div>
+      </section>
+      <section class="card section">
+        <h2 data-t="peakTitle"></h2>
+        <p class="insight" id="heatInsight"></p>
+        <div class="chartbox" id="heatbox"></div>
+        <div class="heatlegend"><span data-t="fewer"></span><span class="ramp"></span><span data-t="moreMatches"></span><span class="na"></span><span data-t="notWatched"></span></div>
+      </section>
+      <div class="cols section">
+        <section class="card">
+          <h2 data-t="detectedMatches"></h2>
+          <ul class="feed" id="feed"></ul>
+        </section>
+        <section class="card">
+          <div class="tablebar">
+            <h2 style="margin:0">Top 250</h2>
+            <input type="search" id="q" data-tp="searchPlayer">
+          </div>
+          <div class="tscroll"><table id="tbl"></table></div>
+        </section>
+      </div>
+    </section>
+    <section class="tab" id="tab-me"></section>
+    <section class="tab" id="tab-friends"></section>
+    <section class="tab" id="tab-helper"></section>
+    <section class="tab" id="tab-learn"></section>
+    <section class="tab" id="tab-archive"></section>
+  </main>
+  <footer data-t="footer"></footer>
+</div>
+<div class="shade" id="shade"></div>
+<aside class="drawer" id="drawer"></aside>
+<script>
+let D = {"season": "", "seasonId": "", "seasonStart": null, "seasonEnd": null, "region": "NA", "updated": 0, "interval": 120, "activeWindow": 20, "watch": [], "players": [], "series": [], "profiles": {}, "events": [], "heat": {"counts": {}, "observed": {}}, "cutoffs": [], "cutoffRanks": [1, 10, 50, 100, 250], "maps": {}, "hasKey": false, "me": null, "friends": [], "archive": [], "files": {"exports": "", "archive": ""}};
+
+const STR = {
+en: {
+  language:"Language", updated:"updated", notRunning:"the program is not running",
+  tabOverview:"Overview", tabMe:"My Stats", tabFriends:"Friends", tabHelper:"Match Helper", tabLearn:"Learn", tabArchive:"Archive",
+  footer:"Public data from the ArenaNet API. Refreshes on every check the program runs. Click any player name to see their profile.",
+  top1:"Top 1", cutoff250:"Top 250 cutoff", rankN:"rank #{n}", activeN:"Active ({n} min)", nobodyYet:"nobody yet",
+  matchesSeen:"Matches seen", lastEvents:"last {n} events", noData:"no data",
+  followRating:"Rating of the players you follow", topRating:"Top {n} rating", noHistory:"No history yet. It shows up after the first check.",
+  onFire:"On fire", cold:"Cold", gains24:"Biggest gains · 24h", drops24:"Biggest drops · 24h",
+  wStreak:"{n}W streak", lStreak:"{n}L streak", noWinStreaks:"No win streaks yet.", noLossStreaks:"No loss streaks yet.",
+  noGains:"Nobody gained rating yet.", noDrops:"Nobody dropped yet.",
+  cutoffsTitle:"Rating needed per rank", cutInsight:"Rank #250 needs {r} today ({d} since the first check). At this pace: ~{p} by the end of the season.",
+  cutInsightNoPace:"Rank #250 needs {r} today. The projection appears after a day of data.",
+  peakTitle:"Peak hours", fewer:"Fewer", moreMatches:"More matches", notWatched:"Not watched yet",
+  heatEmpty:"Keep the program running: this map fills in as it watches. A few days gives a reliable picture.",
+  heatBusiest:"Busiest so far: <b>{when}</b> (~{n} top-250 matches per hour) · based on {h} h of watching, in your local time.",
+  heatEarly:" Still early, give it a few days.", avgPerHour:"Avg matches / hour", hoursWatched:"Hours watched",
+  detectedMatches:"Detected matches", noMatches:"No matches detected yet. They show up from the second check on.",
+  searchPlayer:"Search player...", player:"Player", rating:"Rating", wl:"W-L", winRate:"Win rate", lastMatch:"Last match",
+  notSeen:"not seen", noPlayers:"No players match.", active:"active",
+  tagNew:"NEW", tagOut:"OUT", tagWon:"WON", tagLost:"LOST", tagMixed:"MIXED", entered:"entered #{n}", was:"was #{n}",
+  justNow:"just now", minAgo:"{n} min ago", hAgo:"{n} h ago", dAgo:"{n} d ago", inD:"in {n} days", inH:"in {n} h",
+  close:"Close", rankNo:"Rank #{n}", notInTop:"Not in the top 250 right now", lastMatchAgo:"last match {t}",
+  thisSeason:"{w}-{l} this season", games:"{n} games", streak:"Streak", winsRow:"wins in a row", lossesRow:"losses in a row",
+  noStreak:"no streak seen", last24:"Last 24 h", gamesSeen:"{n} games seen", recentResults:"Recent results",
+  noMatchesSeen:"No matches seen since the program started.", onlySeen:"Only matches seen while the program was running are counted.",
+  // My Stats
+  meTitle:"My Stats", meNeedKey:"See your own rating curve and your win rate by class, map and time of day. It needs a GW2 API key:",
+  meKeySaved:"Your API key is saved. Your stats show up after the next check (if the key has the <b>account</b> and <b>pvp</b> permissions).",
+  keyStep1:"Go to <b>account.arena.net/applications</b> and click <b>New Key</b>. Tick only <b>account</b> and <b>pvp</b>.",
+  keyStep2:"Close the program (Ctrl+C) and start it once with: <code>py gw2_leaderboard_watcher.py --key YOUR-KEY</code>",
+  keyStep3:"After that, just run it as usual. The key is saved in your user folder, not here, and only sent to ArenaNet.",
+  myRating:"My rating", notThisSeason:"not in this season yet", toTarget:"To {t}", done:"Done!", madeIt:"you made it", pointsToGo:"points to go",
+  rankedRecord:"Ranked record", recordedThisSeason:"{n} games recorded this season", recorded:"recorded games",
+  streakText:"{n}-game {k} streak", winWord:"win", lossWord:"loss",
+  myRatingChart:"My rating", bestClass:"Best class: <b>{c}</b> {p} ({n} games)", toughMap:"Toughest map: <b>{c}</b> {p} ({n} games)",
+  byClass:"By class", byMap:"By map", klass:"Class", map:"Map", gamesCol:"Games", ratingCol:"Rating",
+  baseClassNote:"The API reports the base class (e.g. Necromancer), not the elite spec.", noRanked:"No ranked games recorded yet.",
+  lastGames:"My last games", noGamesYet:"No games yet. Play a match and it shows up on the next check.",
+  last10Note:"The API only returns your last 10 games, so keep the program running while you play to build the full history.",
+  ratingEmpty:"Your rating curve shows up after your first recorded ranked game.",
+  tiltTitle:"Tilt check", tiltMsg:"<b>{n} losses in a row.</b> Good moment for a 10-minute break: tilt costs more rating than any bad matchup.",
+  tiltOk:"No tilt alert. Rule of thumb: stop after 2 losses in a row.", dismiss:"Got it",
+  goalsTitle:"Session goals", goalGames:"Games this session", goalTarget:"Target rating", sessionNow:"This session: {n} of {g} games · {d} rating",
+  sessionNone:"No session yet: a session starts with your next ranked game (games more than 45 min apart start a new one).",
+  goalReached:"Session goal reached. Stopping here is a win too.",
+  calcTitle:"Climb calculator", calcAvg:"You win about <b>+{w}</b> per victory and lose about <b>−{l}</b> per defeat.",
+  calcNet:"To reach <b>{t}</b> you need about <b>{n} more wins than losses</b>.",
+  calcPace:"At your current win rate ({wr}) that is around <b>{g} games</b>.",
+  calcDown:"At your current win rate ({wr}) you would drift down. You need at least <b>{need}</b> to climb.",
+  calcNoData:"Shows up after a few recorded ranked games.", calcDone:"You are already above {t}.",
+  hoursTitle:"My best time to play", hoursInsight:"Best block: <b>{b}</b> {p} ({n} games).", hoursNoData:"Needs at least 3 ranked games in one time block.",
+  block:"Time block", queueBusy:"Top-250 activity",
+  seasonTitle:"Season", seasonEnds:"Season ends <b>{d}</b> ({in}).", seasonEnded:"The season ended {d}.",
+  lastRanked:"Your last ranked game: <b>{t}</b>.", noRankedYet:"No ranked game recorded this season yet.",
+  decayNote:"Long inactivity lowers your rating (decay). Playing regularly avoids it.",
+  // Friends
+  friendsTitle:"Friends", friendsIntro:"Friends who share their own API key with you (only with <b>pvp</b> + <b>account</b> permissions, and with their consent).",
+  friendsHow:"Add one with <code>py gw2_leaderboard_watcher.py --add-friend THEIR-KEY</code>. Remove with <code>--remove-friend \"Name.1234\"</code>.",
+  friendsNone:"No friends added yet.", friendCol:"Friend", division:"Division", recordCol:"Recorded W-L", bestClassCol:"Best class",
+  friendsChart:"Friends' rating", friendsChartNote:"Shows the 5 highest-rated friends.", keyProblem:"key problem",
+  // Helper
+  helperTitle:"Match Helper", helperIntro:"At the loading screen, pick the 10 specs. Roles are a best guess: change them if a player runs something else.",
+  yourTeam:"Your team", enemyTeam:"Enemy team", you:"You", empty:"—", roleCol:"Role",
+  roles:{dps:"Damage", condi:"Condi", support:"Support", bunker:"Bunker", roamer:"Roamer"},
+  suggest:"Suggested pick", focusTitle:"Who to focus", openingTitle:"Opening",
+  focusSupport:"Their <b>{s}</b> keeps the team alive: focus it first.", focusSquishy:"Go for the squishiest: <b>{s}</b>.",
+  focusNone:"Pick enemy specs to get a focus tip.",
+  openMid:"Go mid with your teamfighters.", openRoam:"Your team has {n} roamers: let them go far; you go mid.",
+  reasons:{
+    base:"Safe default with your 150 ms ping: lots of sustain.", condiR:"They bring {n} condi players: you cleanse well.",
+    condiBad:"They bring {n} condi players: this build struggles against condi.", supR:"They have {n} support/bunker: you strip their boons.",
+    noFront:"Your team lacks teamfighters: you hold the node.", stack:"Your team already has {n} Necromancer(s): avoid stacking the same role.",
+    glass:"Several squishy power players on their side: you punish them from range.", ranged:"They have ranged pressure ({s}): you tank it and dive.",
+    withSup:"You have a support: you become very hard to kill.", corrupt:"Their {n} Necromancers corrupt boons."
+  },
+  myBuilds:"My builds", logTitle:"Log this match", mapCol:"Map", myPick:"My pick", weWon:"We won", weLost:"We lost",
+  fillFromLast:"Use my last game", logged:"Saved.", needPick:"Pick your build first.",
+  logStats:"My logged matches", byPick:"By my pick", vsEnemy:"Against enemy specs", pickCol:"Pick", specCol:"Spec",
+  noLog:"No matches logged yet. Log them after each game.", exportLog:"Export", importLog:"Import", clearAll:"Reset slots",
+  logNote:"Logged matches are saved in this browser. Export them now and then as a backup.",
+  // Learn
+  learnGloss:"Glossary", learnRot:"Rotation basics", learnMaps:"Maps", learnBuilds:"Meta builds", learnDecoder:"Build code decoder",
+  copy:"Copy", copied:"Copied!", decode:"Decode", source:"Source", buildsNote:"Builds and codes from MetaBattle, up to date for the September 15, 2026 patch. Next balance update: November 10, 2026.",
+  roleCol2:"Role", diffCol:"Difficulty", easy:"Easy", normal:"Normal",
+  decoderIntro:"Paste a build code like <code>[&DQc...]</code> to see its specializations, traits and skills. Names are loaded from the ArenaNet API (needs internet).",
+  decInvalid:"That doesn't look like a build template code.", decLoading:"Loading names from the API...",
+  decOffline:"Couldn't reach the ArenaNet API, showing IDs only.", decProf:"Profession", decSpecs:"Specializations and traits",
+  decSkills:"Skills (heal, utilities, elite)", decLegends:"Legends", decPets:"Pets", decWeapons:"Extra weapons in the code: {n}",
+  secondary:"Secondary objective", tip:"Tip",
+  // Archive
+  archiveTitle:"Season archive", archiveIntro:"The final top 250 of every season the program watched. The current season updates on every check.",
+  archiveNone:"Nothing archived yet.", current:"current", saved:"saved {t}", top10:"Top 10",
+  exportsTitle:"Exports for Excel / Google Sheets", exportsIntro:"Rewritten on every check, in this folder:",
+  exTop:"the whole top 250 right now", exCut:"rating needed per rank over time", exMine:"all your recorded games", exFriends:"your friends' summary",
+  exNote:"Separated by semicolons so they open in one click in Excel in Spanish or Portuguese. In Google Sheets: File > Import."
+},
+es: {
+  language:"Idioma", updated:"actualizado", notRunning:"el programa no está corriendo",
+  tabOverview:"General", tabMe:"Mis stats", tabFriends:"Amigos", tabHelper:"Ayuda de partida", tabLearn:"Aprender", tabArchive:"Archivo",
+  footer:"Datos públicos de la API de ArenaNet. Se actualiza en cada chequeo del programa. Hacé clic en cualquier nombre para ver su ficha.",
+  top1:"Top 1", cutoff250:"Corte top 250", rankN:"puesto #{n}", activeN:"Activos ({n} min)", nobodyYet:"nadie todavía",
+  matchesSeen:"Partidas vistas", lastEvents:"últimos {n} eventos", noData:"sin datos",
+  followRating:"Rating de los jugadores que seguís", topRating:"Rating del top {n}", noHistory:"Todavía no hay historial. Aparece después del primer chequeo.",
+  onFire:"En racha", cold:"En caída", gains24:"Más subieron · 24 h", drops24:"Más bajaron · 24 h",
+  wStreak:"{n} victorias seguidas", lStreak:"{n} derrotas seguidas", noWinStreaks:"Sin rachas de victorias todavía.", noLossStreaks:"Sin rachas de derrotas todavía.",
+  noGains:"Nadie subió todavía.", noDrops:"Nadie bajó todavía.",
+  cutoffsTitle:"Rating necesario por puesto", cutInsight:"El puesto #250 pide {r} hoy ({d} desde el primer chequeo). A este ritmo: ~{p} al cierre de la temporada.",
+  cutInsightNoPace:"El puesto #250 pide {r} hoy. La proyección aparece después de un día de datos.",
+  peakTitle:"Horas pico", fewer:"Menos", moreMatches:"Más partidas", notWatched:"Sin datos todavía",
+  heatEmpty:"Dejá el programa corriendo: este mapa se completa mientras observa. En unos días queda confiable.",
+  heatBusiest:"Más activo hasta ahora: <b>{when}</b> (~{n} partidas del top 250 por hora) · basado en {h} h observadas, en tu hora local.",
+  heatEarly:" Todavía es temprano, dale unos días.", avgPerHour:"Partidas por hora", hoursWatched:"Horas observadas",
+  detectedMatches:"Partidas detectadas", noMatches:"Todavía no se detectaron partidas. Aparecen desde el segundo chequeo.",
+  searchPlayer:"Buscar jugador...", player:"Jugador", rating:"Rating", wl:"V-D", winRate:"Winrate", lastMatch:"Última partida",
+  notSeen:"sin ver", noPlayers:"Ningún jugador coincide.", active:"activo",
+  tagNew:"NUEVO", tagOut:"AFUERA", tagWon:"GANÓ", tagLost:"PERDIÓ", tagMixed:"MIXTO", entered:"entró #{n}", was:"estaba #{n}",
+  justNow:"recién", minAgo:"hace {n} min", hAgo:"hace {n} h", dAgo:"hace {n} d", inD:"en {n} días", inH:"en {n} h",
+  close:"Cerrar", rankNo:"Puesto #{n}", notInTop:"No está en el top 250 ahora", lastMatchAgo:"última partida {t}",
+  thisSeason:"{w}-{l} esta temporada", games:"{n} partidas", streak:"Racha", winsRow:"victorias seguidas", lossesRow:"derrotas seguidas",
+  noStreak:"sin racha vista", last24:"Últimas 24 h", gamesSeen:"{n} partidas vistas", recentResults:"Resultados recientes",
+  noMatchesSeen:"No se vieron partidas desde que arrancó el programa.", onlySeen:"Solo cuentan las partidas vistas mientras el programa estaba corriendo.",
+  meTitle:"Mis stats", meNeedKey:"Mirá tu curva de rating y tu winrate por clase, mapa y horario. Necesita una API key de GW2:",
+  meKeySaved:"Tu API key está guardada. Tus stats aparecen después del próximo chequeo (si la key tiene los permisos <b>account</b> y <b>pvp</b>).",
+  keyStep1:"Entrá a <b>account.arena.net/applications</b> y tocá <b>New Key</b>. Tildá solo <b>account</b> y <b>pvp</b>.",
+  keyStep2:"Cerrá el programa (Ctrl+C) y arrancalo una vez con: <code>py gw2_leaderboard_watcher.py --key TU-KEY</code>",
+  keyStep3:"Después corrélo como siempre. La key se guarda en tu carpeta de usuario, no acá, y solo se manda a ArenaNet.",
+  myRating:"Mi rating", notThisSeason:"todavía no jugaste esta temporada", toTarget:"Para {t}", done:"¡Listo!", madeIt:"lo lograste", pointsToGo:"puntos que faltan",
+  rankedRecord:"Récord ranked", recordedThisSeason:"{n} partidas registradas esta temporada", recorded:"partidas registradas",
+  streakText:"racha de {n} {k}", winWord:"victorias", lossWord:"derrotas",
+  myRatingChart:"Mi rating", bestClass:"Mejor clase: <b>{c}</b> {p} ({n} partidas)", toughMap:"Mapa más difícil: <b>{c}</b> {p} ({n} partidas)",
+  byClass:"Por clase", byMap:"Por mapa", klass:"Clase", map:"Mapa", gamesCol:"Partidas", ratingCol:"Rating",
+  baseClassNote:"La API informa la clase base (por ejemplo Necromancer), no la especialización.", noRanked:"Todavía no hay partidas ranked registradas.",
+  lastGames:"Mis últimas partidas", noGamesYet:"Todavía no hay partidas. Jugá una y aparece en el próximo chequeo.",
+  last10Note:"La API solo devuelve tus últimas 10 partidas: dejá el programa corriendo mientras jugás para no perder ninguna.",
+  ratingEmpty:"Tu curva aparece después de tu primera partida ranked registrada.",
+  tiltTitle:"Control de tilt", tiltMsg:"<b>{n} derrotas seguidas.</b> Buen momento para un corte de 10 minutos: el tilt cuesta más rating que cualquier matchup.",
+  tiltOk:"Sin alerta de tilt. Regla: cortá después de 2 derrotas seguidas.", dismiss:"Entendido",
+  goalsTitle:"Objetivos de sesión", goalGames:"Partidas por sesión", goalTarget:"Rating objetivo", sessionNow:"Esta sesión: {n} de {g} partidas · {d} de rating",
+  sessionNone:"Todavía no hay sesión: arranca con tu próxima ranked (si pasan más de 45 min entre partidas, empieza otra).",
+  goalReached:"Objetivo de sesión cumplido. Cortar acá también es ganar.",
+  calcTitle:"Calculadora de climb", calcAvg:"Ganás unos <b>+{w}</b> por victoria y perdés unos <b>−{l}</b> por derrota.",
+  calcNet:"Para llegar a <b>{t}</b> necesitás unas <b>{n} victorias más que derrotas</b>.",
+  calcPace:"Con tu winrate actual ({wr}) son unas <b>{g} partidas</b>.",
+  calcDown:"Con tu winrate actual ({wr}) irías bajando. Necesitás al menos <b>{need}</b> para subir.",
+  calcNoData:"Aparece después de algunas ranked registradas.", calcDone:"Ya estás por encima de {t}.",
+  hoursTitle:"Mi mejor horario", hoursInsight:"Mejor franja: <b>{b}</b> {p} ({n} partidas).", hoursNoData:"Necesita al menos 3 ranked en una misma franja.",
+  block:"Franja", queueBusy:"Actividad del top 250",
+  seasonTitle:"Temporada", seasonEnds:"La temporada termina el <b>{d}</b> ({in}).", seasonEnded:"La temporada terminó el {d}.",
+  lastRanked:"Tu última ranked: <b>{t}</b>.", noRankedYet:"Todavía no hay ranked registradas esta temporada.",
+  decayNote:"La inactividad larga te baja el rating (decay). Jugar seguido lo evita.",
+  friendsTitle:"Amigos", friendsIntro:"Amigos que te comparten su propia API key (solo con permisos <b>pvp</b> y <b>account</b>, y con su consentimiento).",
+  friendsHow:"Agregá uno con <code>py gw2_leaderboard_watcher.py --add-friend SU-KEY</code>. Para sacarlo: <code>--remove-friend \"Nombre.1234\"</code>.",
+  friendsNone:"Todavía no agregaste amigos.", friendCol:"Amigo", division:"División", recordCol:"V-D registradas", bestClassCol:"Mejor clase",
+  friendsChart:"Rating de tus amigos", friendsChartNote:"Muestra los 5 amigos con más rating.", keyProblem:"problema con la key",
+  helperTitle:"Ayuda de partida", helperIntro:"En la pantalla de carga, elegí las 10 especializaciones. Los roles son una estimación: cambialos si alguien juega otra cosa.",
+  yourTeam:"Tu equipo", enemyTeam:"Equipo rival", you:"Vos", empty:"—", roleCol:"Rol",
+  roles:{dps:"Daño", condi:"Condi", support:"Support", bunker:"Bunker", roamer:"Roamer"},
+  suggest:"Pick sugerido", focusTitle:"A quién focusear", openingTitle:"Opening",
+  focusSupport:"Su <b>{s}</b> mantiene vivo al equipo: focusealo primero.", focusSquishy:"Andá por el más frágil: <b>{s}</b>.",
+  focusNone:"Elegí las especializaciones rivales para ver a quién focusear.",
+  openMid:"Andá a mid con tus teamfighters.", openRoam:"Tu equipo tiene {n} roamers: que ellos vayan a far; vos, a mid.",
+  reasons:{
+    base:"Opción segura con tus 150 ms de ping: mucho sustain.", condiR:"Traen {n} jugadores de condi: vos limpiás bien.",
+    condiBad:"Traen {n} jugadores de condi: esta build sufre contra condi.", supR:"Tienen {n} support/bunker: les sacás los boons.",
+    noFront:"A tu equipo le faltan teamfighters: vos sostenés el nodo.", stack:"Tu equipo ya tiene {n} Necro: no repitas el mismo rol.",
+    glass:"Varios jugadores power frágiles del otro lado: los castigás a distancia.", ranged:"Tienen presión a distancia ({s}): la aguantás y entrás.",
+    withSup:"Tenés support: te volvés muy difícil de matar.", corrupt:"Sus {n} Necros corrompen boons."
+  },
+  myBuilds:"Mis builds", logTitle:"Registrar esta partida", mapCol:"Mapa", myPick:"Mi pick", weWon:"Ganamos", weLost:"Perdimos",
+  fillFromLast:"Usar mi última partida", logged:"Guardado.", needPick:"Primero elegí tu build.",
+  logStats:"Mis partidas registradas", byPick:"Por mi pick", vsEnemy:"Contra especializaciones rivales", pickCol:"Pick", specCol:"Especialización",
+  noLog:"Todavía no registraste partidas. Registralas al terminar cada una.", exportLog:"Exportar", importLog:"Importar", clearAll:"Vaciar",
+  logNote:"Las partidas registradas se guardan en este navegador. Exportalas cada tanto como respaldo.",
+  learnGloss:"Glosario", learnRot:"Rotación básica", learnMaps:"Mapas", learnBuilds:"Builds del meta", learnDecoder:"Decodificador de builds",
+  copy:"Copiar", copied:"¡Copiado!", decode:"Decodificar", source:"Fuente", buildsNote:"Builds y códigos de MetaBattle, actualizados al parche del 15 de septiembre de 2026. Próximo balance: 10 de noviembre de 2026.",
+  roleCol2:"Rol", diffCol:"Dificultad", easy:"Fácil", normal:"Normal",
+  decoderIntro:"Pegá un código de build como <code>[&DQc...]</code> para ver sus especializaciones, traits y skills. Los nombres vienen de la API de ArenaNet (necesita internet).",
+  decInvalid:"Eso no parece un código de build.", decLoading:"Cargando nombres de la API...",
+  decOffline:"No pude llegar a la API de ArenaNet, muestro solo los IDs.", decProf:"Profesión", decSpecs:"Especializaciones y traits",
+  decSkills:"Skills (curación, utilidades, élite)", decLegends:"Leyendas", decPets:"Mascotas", decWeapons:"Armas extra en el código: {n}",
+  secondary:"Objetivo secundario", tip:"Consejo",
+  archiveTitle:"Archivo de temporadas", archiveIntro:"El top 250 final de cada temporada que observó el programa. La temporada actual se actualiza en cada chequeo.",
+  archiveNone:"Todavía no hay nada archivado.", current:"actual", saved:"guardado {t}", top10:"Top 10",
+  exportsTitle:"Exportar a Excel / Google Sheets", exportsIntro:"Se reescriben en cada chequeo, en esta carpeta:",
+  exTop:"el top 250 completo ahora", exCut:"el rating necesario por puesto a lo largo del tiempo", exMine:"todas tus partidas registradas", exFriends:"el resumen de tus amigos",
+  exNote:"Separados por punto y coma para que se abran de un clic en Excel en español. En Google Sheets: Archivo > Importar."
+},
+pt: {
+  language:"Idioma", updated:"atualizado", notRunning:"o programa não está rodando",
+  tabOverview:"Visão geral", tabMe:"Meus stats", tabFriends:"Amigos", tabHelper:"Ajuda na partida", tabLearn:"Aprender", tabArchive:"Arquivo",
+  footer:"Dados públicos da API da ArenaNet. Atualiza a cada verificação do programa. Clique em qualquer nome para ver o perfil.",
+  top1:"Top 1", cutoff250:"Corte do top 250", rankN:"posição #{n}", activeN:"Ativos ({n} min)", nobodyYet:"ninguém ainda",
+  matchesSeen:"Partidas vistas", lastEvents:"últimos {n} eventos", noData:"sem dados",
+  followRating:"Rating dos jogadores que você segue", topRating:"Rating do top {n}", noHistory:"Ainda sem histórico. Aparece depois da primeira verificação.",
+  onFire:"Em sequência", cold:"Em queda", gains24:"Maiores ganhos · 24 h", drops24:"Maiores quedas · 24 h",
+  wStreak:"{n} vitórias seguidas", lStreak:"{n} derrotas seguidas", noWinStreaks:"Ainda sem sequências de vitórias.", noLossStreaks:"Ainda sem sequências de derrotas.",
+  noGains:"Ninguém subiu ainda.", noDrops:"Ninguém caiu ainda.",
+  cutoffsTitle:"Rating necessário por posição", cutInsight:"A posição #250 pede {r} hoje ({d} desde a primeira verificação). Nesse ritmo: ~{p} no fim da temporada.",
+  cutInsightNoPace:"A posição #250 pede {r} hoje. A projeção aparece depois de um dia de dados.",
+  peakTitle:"Horários de pico", fewer:"Menos", moreMatches:"Mais partidas", notWatched:"Ainda sem dados",
+  heatEmpty:"Deixe o programa rodando: este mapa se completa enquanto observa. Em alguns dias fica confiável.",
+  heatBusiest:"Mais movimentado até agora: <b>{when}</b> (~{n} partidas do top 250 por hora) · baseado em {h} h observadas, no seu horário local.",
+  heatEarly:" Ainda é cedo, espere alguns dias.", avgPerHour:"Partidas por hora", hoursWatched:"Horas observadas",
+  detectedMatches:"Partidas detectadas", noMatches:"Nenhuma partida detectada ainda. Aparecem a partir da segunda verificação.",
+  searchPlayer:"Buscar jogador...", player:"Jogador", rating:"Rating", wl:"V-D", winRate:"Taxa de vitória", lastMatch:"Última partida",
+  notSeen:"não visto", noPlayers:"Nenhum jogador encontrado.", active:"ativo",
+  tagNew:"NOVO", tagOut:"FORA", tagWon:"VENCEU", tagLost:"PERDEU", tagMixed:"MISTO", entered:"entrou #{n}", was:"estava #{n}",
+  justNow:"agora", minAgo:"há {n} min", hAgo:"há {n} h", dAgo:"há {n} d", inD:"em {n} dias", inH:"em {n} h",
+  close:"Fechar", rankNo:"Posição #{n}", notInTop:"Fora do top 250 agora", lastMatchAgo:"última partida {t}",
+  thisSeason:"{w}-{l} nesta temporada", games:"{n} partidas", streak:"Sequência", winsRow:"vitórias seguidas", lossesRow:"derrotas seguidas",
+  noStreak:"sem sequência vista", last24:"Últimas 24 h", gamesSeen:"{n} partidas vistas", recentResults:"Resultados recentes",
+  noMatchesSeen:"Nenhuma partida vista desde que o programa começou.", onlySeen:"Só contam as partidas vistas enquanto o programa estava rodando.",
+  meTitle:"Meus stats", meNeedKey:"Veja sua curva de rating e sua taxa de vitória por classe, mapa e horário. Precisa de uma API key do GW2:",
+  meKeySaved:"Sua API key está salva. Seus stats aparecem depois da próxima verificação (se a key tiver as permissões <b>account</b> e <b>pvp</b>).",
+  keyStep1:"Acesse <b>account.arena.net/applications</b> e clique em <b>New Key</b>. Marque só <b>account</b> e <b>pvp</b>.",
+  keyStep2:"Feche o programa (Ctrl+C) e inicie uma vez com: <code>py gw2_leaderboard_watcher.py --key SUA-KEY</code>",
+  keyStep3:"Depois, rode normalmente. A key fica salva na sua pasta de usuário, não aqui, e só é enviada à ArenaNet.",
+  myRating:"Meu rating", notThisSeason:"ainda não jogou nesta temporada", toTarget:"Para {t}", done:"Pronto!", madeIt:"você conseguiu", pointsToGo:"pontos faltando",
+  rankedRecord:"Histórico ranqueado", recordedThisSeason:"{n} partidas registradas nesta temporada", recorded:"partidas registradas",
+  streakText:"sequência de {n} {k}", winWord:"vitórias", lossWord:"derrotas",
+  myRatingChart:"Meu rating", bestClass:"Melhor classe: <b>{c}</b> {p} ({n} partidas)", toughMap:"Mapa mais difícil: <b>{c}</b> {p} ({n} partidas)",
+  byClass:"Por classe", byMap:"Por mapa", klass:"Classe", map:"Mapa", gamesCol:"Partidas", ratingCol:"Rating",
+  baseClassNote:"A API informa a classe base (ex.: Necromancer), não a especialização.", noRanked:"Ainda sem partidas ranqueadas registradas.",
+  lastGames:"Minhas últimas partidas", noGamesYet:"Ainda sem partidas. Jogue uma e ela aparece na próxima verificação.",
+  last10Note:"A API só devolve suas últimas 10 partidas: deixe o programa rodando enquanto joga para não perder nenhuma.",
+  ratingEmpty:"Sua curva aparece depois da primeira partida ranqueada registrada.",
+  tiltTitle:"Controle de tilt", tiltMsg:"<b>{n} derrotas seguidas.</b> Bom momento para uma pausa de 10 minutos: o tilt custa mais rating que qualquer matchup.",
+  tiltOk:"Sem alerta de tilt. Regra: pare depois de 2 derrotas seguidas.", dismiss:"Entendi",
+  goalsTitle:"Metas da sessão", goalGames:"Partidas por sessão", goalTarget:"Rating alvo", sessionNow:"Esta sessão: {n} de {g} partidas · {d} de rating",
+  sessionNone:"Ainda sem sessão: ela começa na sua próxima ranqueada (mais de 45 min entre partidas inicia outra).",
+  goalReached:"Meta da sessão cumprida. Parar aqui também é vencer.",
+  calcTitle:"Calculadora de subida", calcAvg:"Você ganha cerca de <b>+{w}</b> por vitória e perde cerca de <b>−{l}</b> por derrota.",
+  calcNet:"Para chegar a <b>{t}</b> você precisa de umas <b>{n} vitórias a mais que derrotas</b>.",
+  calcPace:"Com sua taxa atual ({wr}) são umas <b>{g} partidas</b>.",
+  calcDown:"Com sua taxa atual ({wr}) você cairia. Precisa de pelo menos <b>{need}</b> para subir.",
+  calcNoData:"Aparece depois de algumas ranqueadas registradas.", calcDone:"Você já está acima de {t}.",
+  hoursTitle:"Meu melhor horário", hoursInsight:"Melhor faixa: <b>{b}</b> {p} ({n} partidas).", hoursNoData:"Precisa de pelo menos 3 ranqueadas na mesma faixa.",
+  block:"Faixa", queueBusy:"Atividade do top 250",
+  seasonTitle:"Temporada", seasonEnds:"A temporada termina em <b>{d}</b> ({in}).", seasonEnded:"A temporada terminou em {d}.",
+  lastRanked:"Sua última ranqueada: <b>{t}</b>.", noRankedYet:"Ainda sem ranqueadas registradas nesta temporada.",
+  decayNote:"Muito tempo sem jogar reduz seu rating (decay). Jogar com frequência evita isso.",
+  friendsTitle:"Amigos", friendsIntro:"Amigos que compartilham a própria API key com você (só com permissões <b>pvp</b> e <b>account</b>, e com o consentimento deles).",
+  friendsHow:"Adicione com <code>py gw2_leaderboard_watcher.py --add-friend KEY-DELE</code>. Para remover: <code>--remove-friend \"Nome.1234\"</code>.",
+  friendsNone:"Nenhum amigo adicionado ainda.", friendCol:"Amigo", division:"Divisão", recordCol:"V-D registradas", bestClassCol:"Melhor classe",
+  friendsChart:"Rating dos amigos", friendsChartNote:"Mostra os 5 amigos com maior rating.", keyProblem:"problema com a key",
+  helperTitle:"Ajuda na partida", helperIntro:"Na tela de carregamento, escolha as 10 especializações. Os papéis são uma estimativa: mude se alguém jogar outra coisa.",
+  yourTeam:"Seu time", enemyTeam:"Time inimigo", you:"Você", empty:"—", roleCol:"Papel",
+  roles:{dps:"Dano", condi:"Condi", support:"Suporte", bunker:"Bunker", roamer:"Roamer"},
+  suggest:"Pick sugerido", focusTitle:"Em quem focar", openingTitle:"Abertura",
+  focusSupport:"O <b>{s}</b> deles mantém o time vivo: foque nele primeiro.", focusSquishy:"Vá no mais frágil: <b>{s}</b>.",
+  focusNone:"Escolha as especializações inimigas para ver em quem focar.",
+  openMid:"Vá para o mid com seus teamfighters.", openRoam:"Seu time tem {n} roamers: eles vão para o far; você vai para o mid.",
+  reasons:{
+    base:"Opção segura com seus 150 ms de ping: muito sustain.", condiR:"Eles trazem {n} jogadores de condi: você limpa bem.",
+    condiBad:"Eles trazem {n} jogadores de condi: esta build sofre contra condi.", supR:"Eles têm {n} suporte/bunker: você tira os boons deles.",
+    noFront:"Falta teamfighter no seu time: você segura o ponto.", stack:"Seu time já tem {n} Necro: evite repetir o mesmo papel.",
+    glass:"Vários jogadores power frágeis do outro lado: você pune à distância.", ranged:"Eles têm pressão à distância ({s}): você aguenta e entra.",
+    withSup:"Você tem suporte: fica muito difícil de matar.", corrupt:"Os {n} Necros deles corrompem boons."
+  },
+  myBuilds:"Minhas builds", logTitle:"Registrar esta partida", mapCol:"Mapa", myPick:"Meu pick", weWon:"Vencemos", weLost:"Perdemos",
+  fillFromLast:"Usar minha última partida", logged:"Salvo.", needPick:"Escolha sua build primeiro.",
+  logStats:"Minhas partidas registradas", byPick:"Por meu pick", vsEnemy:"Contra especializações inimigas", pickCol:"Pick", specCol:"Especialização",
+  noLog:"Nenhuma partida registrada ainda. Registre ao terminar cada uma.", exportLog:"Exportar", importLog:"Importar", clearAll:"Limpar",
+  logNote:"As partidas registradas ficam salvas neste navegador. Exporte de vez em quando como backup.",
+  learnGloss:"Glossário", learnRot:"Rotação básica", learnMaps:"Mapas", learnBuilds:"Builds do meta", learnDecoder:"Decodificador de builds",
+  copy:"Copiar", copied:"Copiado!", decode:"Decodificar", source:"Fonte", buildsNote:"Builds e códigos do MetaBattle, atualizados para o patch de 15 de setembro de 2026. Próximo balanceamento: 10 de novembro de 2026.",
+  roleCol2:"Papel", diffCol:"Dificuldade", easy:"Fácil", normal:"Normal",
+  decoderIntro:"Cole um código de build como <code>[&DQc...]</code> para ver especializações, traits e skills. Os nomes vêm da API da ArenaNet (precisa de internet).",
+  decInvalid:"Isso não parece um código de build.", decLoading:"Carregando nomes da API...",
+  decOffline:"Não consegui acessar a API da ArenaNet, mostrando só os IDs.", decProf:"Profissão", decSpecs:"Especializações e traits",
+  decSkills:"Skills (cura, utilitárias, elite)", decLegends:"Lendas", decPets:"Pets", decWeapons:"Armas extras no código: {n}",
+  secondary:"Objetivo secundário", tip:"Dica",
+  archiveTitle:"Arquivo de temporadas", archiveIntro:"O top 250 final de cada temporada que o programa observou. A temporada atual se atualiza a cada verificação.",
+  archiveNone:"Nada arquivado ainda.", current:"atual", saved:"salvo {t}", top10:"Top 10",
+  exportsTitle:"Exportar para Excel / Google Sheets", exportsIntro:"Reescritos a cada verificação, nesta pasta:",
+  exTop:"o top 250 completo agora", exCut:"o rating necessário por posição ao longo do tempo", exMine:"todas as suas partidas registradas", exFriends:"o resumo dos seus amigos",
+  exNote:"Separados por ponto e vírgula para abrir com um clique no Excel em português. No Google Sheets: Arquivo > Importar."
+}};
+
+// ---- Glossary: [term, en, es, pt]
+const GLOSSARY = [
+ ["Node / point", "One of the 3 capture circles. Holding it earns points every few seconds.", "Uno de los 3 círculos de captura. Tenerlo suma puntos cada pocos segundos.", "Um dos 3 círculos de captura. Mantê-lo rende pontos a cada poucos segundos."],
+ ["Home / Mid / Far", "Your side's node, the center one, and the one on the enemy side.", "El nodo de tu lado, el del centro y el del lado rival.", "O ponto do seu lado, o do centro e o do lado inimigo."],
+ ["Cap / Decap", "Capture a node / neutralize an enemy node without staying to capture it.", "Capturar un nodo / neutralizar uno rival sin quedarse a capturarlo.", "Capturar um ponto / neutralizar um ponto inimigo sem ficar para capturar."],
+ ["Contested", "Both teams on a node: nobody scores from it while it lasts.", "Hay jugadores de los dos equipos en el nodo: nadie suma mientras dure.", "Os dois times no ponto: ninguém pontua enquanto durar."],
+ ["+1", "Joining a fight to make it uneven in your favor (2v1, 3v2).", "Sumarse a una pelea para desequilibrarla a tu favor (2v1, 3v2).", "Entrar numa luta para desequilibrá-la a seu favor (2v1, 3v2)."],
+ ["Rotation", "Moving between nodes at the right time to where you're needed most.", "Moverse entre nodos en el momento justo hacia donde más hacés falta.", "Mover-se entre pontos na hora certa para onde você faz mais falta."],
+ ["Teamfighter", "Build made to win big fights on a node (e.g. Reaper, Conduit).", "Build hecha para ganar peleas grandes en un nodo (por ejemplo Reaper, Conduit).", "Build feita para vencer lutas grandes no ponto (ex.: Reaper, Conduit)."],
+ ["Roamer", "Fast build that decaps, +1s and picks off isolated players.", "Build rápida que decapea, hace +1 y caza jugadores aislados.", "Build rápida que neutraliza, faz +1 e caça jogadores isolados."],
+ ["Bunker / Duelist", "Very hard to kill, holds a node alone for a long time.", "Muy difícil de matar, sostiene un nodo solo por mucho tiempo.", "Muito difícil de matar, segura um ponto sozinho por muito tempo."],
+ ["Support", "Heals, cleanses and gives boons to the team.", "Cura, limpia condiciones y da boons al equipo.", "Cura, limpa condições e dá boons ao time."],
+ ["Burst", "Lots of damage in a very short window.", "Mucho daño en muy poco tiempo.", "Muito dano em pouco tempo."],
+ ["Condi / Power", "Damage over time from conditions vs. direct hit damage.", "Daño en el tiempo por condiciones vs. daño directo de golpes.", "Dano ao longo do tempo por condições vs. dano direto."],
+ ["Cleanse", "Removing conditions from yourself or allies.", "Sacarte condiciones a vos o a tus aliados.", "Remover condições de você ou dos aliados."],
+ ["Boon strip / corrupt", "Removing enemy boons, or turning them into conditions.", "Sacarle boons al rival, o convertirlos en condiciones.", "Remover boons do inimigo, ou transformá-los em condições."],
+ ["CC", "Crowd control: stun, knockdown, fear, daze... it stops the target from acting.", "Control: stun, derribo, fear, daze... impide que el objetivo actúe.", "Controle: stun, derrubada, fear, daze... impede o alvo de agir."],
+ ["Stability", "Boon that protects you from CC.", "Boon que te protege del control (CC).", "Boon que protege contra controle (CC)."],
+ ["Stomp / Cleave", "Finish a downed enemy with F / kill them with area damage.", "Rematar a un rival caído con F / matarlo con daño en área.", "Finalizar um inimigo caído com F / matá-lo com dano em área."],
+ ["Rez", "Reviving a downed ally.", "Revivir a un aliado caído.", "Reviver um aliado caído."],
+ ["Focus / Peel", "Everyone hitting the same target / protecting an ally who is being focused.", "Que todos peguen al mismo objetivo / proteger a un aliado al que están focuseando.", "Todos batendo no mesmo alvo / proteger um aliado que está sendo focado."],
+ ["Kite / LoS", "Fighting while backing off / breaking line of sight with walls and pillars.", "Pelear mientras retrocedés / cortar la línea de visión con paredes y pilares.", "Lutar recuando / quebrar a linha de visão com paredes e pilares."],
+ ["Snowball", "Winning a fight and immediately using the advantage on the next node.", "Ganar una pelea y usar la ventaja enseguida en el próximo nodo.", "Vencer uma luta e usar a vantagem logo no próximo ponto."],
+ ["Secondary objective", "The map's special mechanic (lord, orb, meditations...) for bonus points.", "La mecánica especial del mapa (lord, orbe, meditaciones...) para puntos extra.", "A mecânica especial do mapa (lord, orbe, meditações...) para pontos extras."]
+];
+
+// ---- Rotation basics: [en, es, pt]
+const ROTATION = [
+ ["Fight on the node, never off it. If they run away, let them: they aren't capping.", "Peleá sobre el nodo, nunca afuera. Si el rival huye, dejalo: no está capturando.", "Lute no ponto, nunca fora. Se o inimigo fugir, deixe: ele não está capturando."],
+ ["Count the enemies. If you see 4 at mid, the fifth is on a node: help home or go to an empty far.", "Contá enemigos. Si ves 4 en mid, el quinto está en un nodo: ayudá en home o andá a far vacío.", "Conte os inimigos. Se vê 4 no mid, o quinto está num ponto: ajude no home ou vá ao far vazio."],
+ ["The +1 wins games. Join the fight where your arrival turns a 2v2 into a 3v2. An even 1v1 is not worth it.", "El +1 gana partidas. Sumate donde tu llegada convierte un 2v2 en 3v2. Un 1v1 parejo no vale la pena.", "O +1 vence partidas. Entre onde sua chegada transforma um 2v2 em 3v2. Um 1v1 equilibrado não vale a pena."],
+ ["After winning mid, don't all run far. One or two decap, the rest reset at mid.", "Después de ganar mid, no van todos a far. Uno o dos decapean, el resto se reacomoda en mid.", "Depois de vencer o mid, não vão todos ao far. Um ou dois neutralizam, o resto se reorganiza no mid."],
+ ["Losing a 1v1 at home? Stay in the circle: a contested node scores for nobody. Ask for help.", "¿Perdés un 1v1 en home? Quedate en el círculo: un nodo contestado no suma para nadie. Pedí ayuda.", "Perdendo um 1v1 no home? Fique no círculo: um ponto contestado não pontua para ninguém. Peça ajuda."],
+ ["Finishing beats damage. A downed enemy you don't stomp or cleave comes back.", "Rematar vale más que pegar. Un caído que no stompeás ni cliveás vuelve a la pelea.", "Finalizar vale mais que bater. Um caído que você não finaliza volta para a luta."],
+ ["Don't respawn and run alone into the same lost fight. Wait for your teammate and go back together.", "No respawnees y corras solo a la misma pelea perdida. Esperá a tu compañero y vuelvan juntos.", "Não renasça e corra sozinho para a mesma luta perdida. Espere seu colega e voltem juntos."],
+ ["Winning by a lot: play safe and hold your 2 nodes. Losing: take risks on far and the secondary objective.", "Ganando por mucho: jugá seguro y sostené tus 2 nodos. Perdiendo: arriesgá en far y en el objetivo secundario.", "Vencendo por muito: jogue seguro e segure seus 2 pontos. Perdendo: arrisque no far e no objetivo secundário."]
+];
+
+// ---- Maps: name, secondary [en,es,pt], tip [en,es,pt]  (mechanics per the GW2 Wiki)
+const MAPS = [
+ {name:"Battle of Kyhlo",
+  sec:["Each team has a trebuchet that hits anywhere on the map (no friendly fire). If it's destroyed, a repair kit spawns to fix it.",
+       "Cada equipo tiene un trebuchet que pega en cualquier parte del mapa (sin fuego amigo). Si lo destruyen, aparece un kit para repararlo.",
+       "Cada time tem um trebuchet que acerta qualquer parte do mapa (sem fogo amigo). Se for destruído, surge um kit para consertá-lo."],
+  tip:["Mid is the Clocktower: reachable from inside or by the side ramps. Use the buildings as cover.",
+       "Mid es el Clocktower: se entra por adentro o por las rampas laterales. Usá los edificios como cobertura.",
+       "O mid é o Clocktower: entra-se por dentro ou pelas rampas laterais. Use os prédios como cobertura."]},
+ {name:"Forest of Niflhel",
+  sec:["Two NPCs, the Svanir and Chieftain Utahein: killing one gives 25 points and a stat buff to your team.",
+       "Dos NPC, el Svanir y el Chieftain Utahein: matar uno da 25 puntos y un buff de atributos a tu equipo.",
+       "Dois NPCs, o Svanir e o Chieftain Utahein: matar um dá 25 pontos e um buff de atributos ao seu time."],
+  tip:["Don't take the NPC while your team is losing a fight: they are worth it only when the enemy can't contest.",
+       "No vayas al NPC mientras tu equipo pierde una pelea: valen la pena solo cuando el rival no puede disputarlo.",
+       "Não vá ao NPC enquanto seu time perde uma luta: vale a pena só quando o inimigo não pode disputar."]},
+ {name:"Legacy of the Foefire",
+  sec:["Each team has a Guild Lord in its base. Killing the enemy lord gives 150 points.",
+       "Cada equipo tiene un Guild Lord en su base. Matar al lord rival da 150 puntos.",
+       "Cada time tem um Guild Lord na base. Matar o lord inimigo dá 150 pontos."],
+  tip:["Try the lord when the enemy is dead or far away, and keep one eye on your own lord.",
+       "Intentá el lord cuando el rival está muerto o lejos, y vigilá el tuyo.",
+       "Tente o lord quando o inimigo estiver morto ou longe, e fique de olho no seu."]},
+ {name:"Temple of the Silent Storm",
+  sec:["Meditations: Stillness doubles your node points for a while; Tranquility captures all three nodes for your team. Damage, teleports and stealth interrupt the channel.",
+       "Meditaciones: Stillness duplica los puntos de tus nodos por un rato; Tranquility captura los tres nodos para tu equipo. Recibir daño, teletransportarse o entrar en sigilo cortan la canalización.",
+       "Meditações: Stillness dobra os pontos dos seus pontos por um tempo; Tranquility captura os três pontos para o seu time. Dano, teleporte e furtividade interrompem a canalização."],
+  tip:["Tranquility spawns at 8:30 and 2:30 on the timer: be ready to stop the enemy channel.",
+       "Tranquility aparece a las 8:30 y 2:30 del reloj: estate listo para cortar la canalización rival.",
+       "Tranquility aparece aos 8:30 e 2:30 do relógio: esteja pronto para interromper a canalização inimiga."]},
+ {name:"Spirit Watch",
+  sec:["An orb spawns in the middle: carry it to a node your team holds for bonus points.",
+       "Aparece un orbe en el centro: llevalo a un nodo de tu equipo para sumar puntos extra.",
+       "Um orbe surge no centro: leve-o a um ponto do seu time para pontos extras."],
+  tip:["The orb carrier can't use mobility well: escort them or kill the enemy carrier on the way.",
+       "Quien lleva el orbe no puede usar bien su movilidad: escoltalo o cazá al portador rival en el camino.",
+       "Quem carrega o orbe não usa bem a mobilidade: escolte ou cace o portador inimigo no caminho."]},
+ {name:"Skyhammer",
+  sec:["The cannon room opens at minutes 3, 6, 9 and 12. Capturing it fires at all three nodes: damage, knockdown and it neutralizes nodes you don't hold.",
+       "La sala del cañón se abre en los minutos 3, 6, 9 y 12. Capturarla dispara a los tres nodos: daño, derribo y neutraliza los nodos que no son tuyos.",
+       "A sala do canhão abre nos minutos 3, 6, 9 e 12. Capturá-la dispara nos três pontos: dano, derrubada e neutraliza os pontos que não são seus."],
+  tip:["Watch the timer and dodge the blast. Jump pads give height but block reuse for 3 seconds.",
+       "Mirá el reloj y esquivá el disparo. Los saltadores dan altura pero bloquean reusarlos por 3 segundos.",
+       "Olhe o relógio e desvie do disparo. Os trampolins dão altura mas bloqueiam reuso por 3 segundos."]},
+ {name:"Revenge of the Capricorn",
+  sec:["A bell appears in the middle every 3 minutes. Capturing it fires at the Capricorn ship: +25, +50, +75 and +100 points (each team counts its own captures).",
+       "Una campana aparece en el centro cada 3 minutos. Capturarla dispara al barco Capricorn: +25, +50, +75 y +100 puntos (cada equipo cuenta sus capturas).",
+       "Um sino aparece no centro a cada 3 minutos. Capturá-lo dispara no navio Capricorn: +25, +50, +75 e +100 pontos (cada time conta suas capturas)."],
+  tip:["The bell gets worth more each time: late in the game it can flip the result.",
+       "La campana vale más cada vez: al final de la partida puede dar vuelta el resultado.",
+       "O sino vale mais a cada vez: no fim da partida pode virar o resultado."]},
+ {name:"Eternal Coliseum",
+  sec:["Every 3 minutes two artifacts spawn: Sword of Reaping (+20% damage for the team) and Shield of Life (+5000 health and toughness for the team), for 90 seconds.",
+       "Cada 3 minutos aparecen dos artefactos: Sword of Reaping (+20% de daño al equipo) y Shield of Life (+5000 de vida y dureza al equipo), por 90 segundos.",
+       "A cada 3 minutos surgem dois artefatos: Sword of Reaping (+20% de dano ao time) e Shield of Life (+5000 de vida e resistência ao time), por 90 segundos."],
+  tip:["Time your big fights with your team's buff, and avoid fighting while the enemy has it.",
+       "Hacé coincidir las peleas grandes con el buff de tu equipo y evitá pelear mientras lo tiene el rival.",
+       "Sincronize as lutas grandes com o buff do seu time e evite lutar enquanto o inimigo o tiver."]},
+ {name:"Djinn's Dominion",
+  sec:["A lamp in the center is ready every 2 minutes. Channeling it gives one random skill: Giant Meteor, Waters of Life (revives allies) or Starfall (neutralizes enemy nodes).",
+       "Una lámpara en el centro está lista cada 2 minutos. Canalizarla da una skill al azar: Giant Meteor, Waters of Life (revive aliados) o Starfall (neutraliza nodos rivales).",
+       "Uma lâmpada no centro fica pronta a cada 2 minutos. Canalizá-la dá uma skill aleatória: Giant Meteor, Waters of Life (revive aliados) ou Starfall (neutraliza pontos inimigos)."],
+  tip:["Nodes are Pier, Market (mid) and Plaza. Using the lamp blocks teleports for a while, so plan your exit.",
+       "Los nodos son Pier, Market (mid) y Plaza. Usar la lámpara bloquea los teletransportes un rato: planeá la salida.",
+       "Os pontos são Pier, Market (mid) e Plaza. Usar a lâmpada bloqueia teleportes por um tempo: planeje a saída."]}
+];
+
+// ---- Meta builds (MetaBattle, patch Sep 15 2026)
+const BUILDS = [
+ {name:"Spite Siphon Reaper", cls:"Necromancer", role:["Teamfight / duel","Teamfight / duelo","Teamfight / duelo"], diff:"easy",
+  code:"[&DQg1HhMfIhfBEgAA8RIAAPUAAAB0AQAAAxMAAAAAAAAAAAAAAAAAAAAAAAADWgBnAAkBAA==]", url:"https://metabattle.com/wiki/Build:Reaper_-_Spite_Siphon_Reaper"},
+ {name:"Blood Power Ritualist", cls:"Necromancer", role:["Duel / teamfight","Duelo / teamfight","Duelo / teamfight"], diff:"easy",
+  code:"[&DQgTPzImTDuiAAAA+gC9AWQdAACNHQAAfR0AAAAAAAAAAAAAAAAAAAAAAAADVgBaAFkAAA==]", url:"https://metabattle.com/wiki/Build:Ritualist_-_Blood_Power_Ritualist"},
+ {name:"Power Speartuoso", cls:"Mesmer", role:["Ranged damage","Daño a distancia","Dano à distância"], diff:"easy",
+  code:"[&DQcBGhgpQiVuAQAA3BoAAGUBAACDAQAAmgEAAAAAAAAAAAAAAAAAAAAAAAADLwBXAAkBAA==]", url:"https://metabattle.com/wiki/Build:Virtuoso_-_Power_Speartuoso"},
+ {name:"Condition Mallyx Conduit", cls:"Revenant", role:["Teamfight","Teamfight","Teamfight"], diff:"normal",
+  code:"[&DQkONgkbTxncEdwRBhIGEisSKxLUEdQRyhHKEQMEAwAGEisS1BEAAAAAAAADCQE1AFcAAA==]", url:"https://metabattle.com/wiki/Build:Conduit_-_Condition_Mallyx_Conduit"},
+ {name:"Power Shiro Conduit", cls:"Revenant", role:["Damage / roaming","Daño / roaming","Dano / roaming"], diff:"normal",
+  code:"[&DQkJGQM7TyncEdwRKxIGEtQRKxIGEtQRyhHKEQgCAgAGEisS1BEAAAAAAAADCQE1AFcAAA==]", url:"https://metabattle.com/wiki/Build:Conduit_-_Power_Shiro_Conduit"}
+];
+
+// ---- Specs for the Match Helper: [spec, profession, default role]
+const SPECS = [
+ ["Guardian","Guardian","dps"],["Dragonhunter","Guardian","dps"],["Firebrand","Guardian","support"],["Willbender","Guardian","roamer"],["Luminary","Guardian","dps"],
+ ["Warrior","Warrior","dps"],["Berserker","Warrior","condi"],["Spellbreaker","Warrior","dps"],["Bladesworn","Warrior","dps"],["Paragon","Warrior","support"],
+ ["Engineer","Engineer","dps"],["Scrapper","Engineer","support"],["Holosmith","Engineer","roamer"],["Mechanist","Engineer","condi"],["Amalgam","Engineer","bunker"],
+ ["Ranger","Ranger","dps"],["Druid","Ranger","support"],["Soulbeast","Ranger","roamer"],["Untamed","Ranger","dps"],["Galeshot","Ranger","roamer"],
+ ["Thief","Thief","roamer"],["Daredevil","Thief","roamer"],["Deadeye","Thief","roamer"],["Specter","Thief","condi"],["Antiquary","Thief","roamer"],
+ ["Elementalist","Elementalist","dps"],["Tempest","Elementalist","support"],["Weaver","Elementalist","dps"],["Catalyst","Elementalist","dps"],["Evoker","Elementalist","roamer"],
+ ["Mesmer","Mesmer","roamer"],["Chronomancer","Mesmer","support"],["Mirage","Mesmer","roamer"],["Virtuoso","Mesmer","dps"],["Troubadour","Mesmer","support"],
+ ["Necromancer","Necromancer","condi"],["Reaper","Necromancer","dps"],["Scourge","Necromancer","condi"],["Harbinger","Necromancer","condi"],["Ritualist","Necromancer","dps"],
+ ["Revenant","Revenant","dps"],["Herald","Revenant","dps"],["Renegade","Revenant","condi"],["Vindicator","Revenant","dps"],["Conduit","Revenant","condi"]
+];
+
+// ---- Your pick candidates for the Match Helper
+const CANDS = [
+ {id:"reaper", name:"Spite Reaper", prof:"Necromancer", base:3},
+ {id:"ritualist", name:"Blood Ritualist", prof:"Necromancer", base:2},
+ {id:"virtuoso", name:"Power Virtuoso", prof:"Mesmer", base:2},
+ {id:"conduitC", name:"Condi Conduit", prof:"Revenant", base:2},
+ {id:"conduitP", name:"Power Conduit", prof:"Revenant", base:1},
+ {id:"luminary", name:"Radiant Luminary", prof:"Guardian", base:1}
+];
+
+Object.assign(STR.en, {
+  last10Note:"The API only returns your last 10 games, so keep this page open while you play to build the full history.", tabArchive:"My data", notRunning:"not updating", regionLabel:"Region",
+  footer:"Public data from the ArenaNet API, refreshed every 2 minutes while this page is open. Fan-made, not affiliated with ArenaNet. Click any player name to see their profile.",
+  loading:"loading the leaderboard…", apiErr:"can't reach the GW2 API, retrying in 2 min", noSeason:"no ranked season active right now",
+  meKeySaved:"Key saved. Loading your stats from ArenaNet…",
+  keyStep2:"Paste it below and press <b>Save</b>.",
+  keyStep3:"The key stays in this browser only and is sent only to ArenaNet. Don't show it on stream or in screenshots.",
+  keyPh:"Paste your API key", keySave:"Save", keyChecking:"Checking the key…", keyBad:"That key was rejected or is missing the account and pvp permissions.",
+  keyNet:"Couldn't check the key right now. Try again in a minute.", keyHere:"Your API key is saved in this browser.", keyRemove:"Remove my key",
+  friendsHow:"Paste a friend's own key (only <b>account</b> + <b>pvp</b>, and only with their OK). It stays in this browser.",
+  friendPh:"Friend's API key", addFriend:"Add friend", remove:"Remove", friendAdded:"Added {n}.", friendDup:"{n} is already in the list.", friendSelf:"That's your own key.",
+  dataTitle:"My data", dataIntro:"The shared history is collected around the clock by the server and loads every time you open the page. Your key, friends and logged matches stay in this browser only.",
+  dataSince:"History since", dataChecks:"Last update", dataSeed:"Shared history updated", dataNoSeed:"not available", dataSize:"Stored in this browser",
+  dlTitle:"Download for Excel / Google Sheets", dlTop:"Top 250", dlCut:"Rating cutoffs", dlMine:"My games",
+  resetTitle:"Start over", resetIntro:"Deletes the copy of the history saved in this browser (the shared history loads again on the next update). Your key, friends and logged matches stay.",
+  resetBtn:"Clear history", resetConfirm:"Click again to confirm", resetDone:"History cleared."
+});
+Object.assign(STR.es, {
+  last10Note:"La API solo devuelve tus últimas 10 partidas: dejá esta página abierta mientras jugás para no perder ninguna.", tabArchive:"Mis datos", notRunning:"sin actualizar", regionLabel:"Región",
+  footer:"Datos públicos de la API de ArenaNet, se actualizan cada 2 minutos mientras la página está abierta. Hecho por fans, sin relación con ArenaNet. Hacé clic en cualquier nombre para ver su ficha.",
+  loading:"cargando el leaderboard…", apiErr:"no se puede conectar con la API de GW2, reintento en 2 min", noSeason:"no hay temporada ranked activa ahora",
+  meKeySaved:"Key guardada. Cargando tus stats desde ArenaNet…",
+  keyStep2:"Pegala abajo y tocá <b>Guardar</b>.",
+  keyStep3:"La key queda solo en este navegador y solo se manda a ArenaNet. No la muestres en stream ni en capturas.",
+  keyPh:"Pegá tu API key", keySave:"Guardar", keyChecking:"Revisando la key…", keyBad:"La key fue rechazada o le faltan los permisos account y pvp.",
+  keyNet:"No se pudo revisar la key ahora. Probá de nuevo en un minuto.", keyHere:"Tu API key está guardada en este navegador.", keyRemove:"Borrar mi key",
+  friendsHow:"Pegá la key propia de un amigo (solo <b>account</b> + <b>pvp</b>, y con su permiso). Queda en este navegador.",
+  friendPh:"API key de tu amigo", addFriend:"Agregar amigo", remove:"Quitar", friendAdded:"Agregado {n}.", friendDup:"{n} ya está en la lista.", friendSelf:"Esa es tu propia key.",
+  dataTitle:"Mis datos", dataIntro:"El historial compartido lo junta el servidor las 24 horas y se carga cada vez que abrís la página. Tu key, tus amigos y las partidas anotadas quedan solo en este navegador.",
+  dataSince:"Historial desde", dataChecks:"Última actualización", dataSeed:"Historial compartido actualizado", dataNoSeed:"no disponible", dataSize:"Guardado en este navegador",
+  dlTitle:"Descargar para Excel / Google Sheets", dlTop:"Top 250", dlCut:"Cortes de rating", dlMine:"Mis partidas",
+  resetTitle:"Empezar de cero", resetIntro:"Borra la copia del historial guardada en este navegador (el historial compartido vuelve a cargarse en la próxima actualización). Tu key, tus amigos y las partidas anotadas quedan.",
+  resetBtn:"Borrar historial", resetConfirm:"Clic de nuevo para confirmar", resetDone:"Historial borrado."
+});
+Object.assign(STR.pt, {
+  last10Note:"A API só devolve suas últimas 10 partidas: deixe esta página aberta enquanto joga para não perder nenhuma.", tabArchive:"Meus dados", notRunning:"sem atualizar", regionLabel:"Região",
+  footer:"Dados públicos da API da ArenaNet, atualizados a cada 2 minutos enquanto a página está aberta. Feito por fãs, sem relação com a ArenaNet. Clique em qualquer nome para ver o perfil.",
+  loading:"carregando o leaderboard…", apiErr:"sem conexão com a API do GW2, tentando de novo em 2 min", noSeason:"nenhuma temporada ranked ativa agora",
+  meKeySaved:"Key salva. Carregando seus stats da ArenaNet…",
+  keyStep2:"Cole abaixo e clique em <b>Salvar</b>.",
+  keyStep3:"A key fica só neste navegador e só é enviada para a ArenaNet. Não mostre em live nem em prints.",
+  keyPh:"Cole sua API key", keySave:"Salvar", keyChecking:"Verificando a key…", keyBad:"A key foi recusada ou não tem as permissões account e pvp.",
+  keyNet:"Não deu para verificar a key agora. Tente de novo em um minuto.", keyHere:"Sua API key está salva neste navegador.", keyRemove:"Apagar minha key",
+  friendsHow:"Cole a key do seu amigo (só <b>account</b> + <b>pvp</b>, e com a permissão dele). Ela fica neste navegador.",
+  friendPh:"API key do amigo", addFriend:"Adicionar amigo", remove:"Remover", friendAdded:"{n} adicionado.", friendDup:"{n} já está na lista.", friendSelf:"Essa é a sua própria key.",
+  dataTitle:"Meus dados", dataIntro:"O histórico compartilhado é coletado pelo servidor 24 horas por dia e carrega toda vez que você abre a página. Sua key, amigos e partidas anotadas ficam só neste navegador.",
+  dataSince:"Histórico desde", dataChecks:"Última atualização", dataSeed:"Histórico compartilhado atualizado", dataNoSeed:"não disponível", dataSize:"Salvo neste navegador",
+  dlTitle:"Baixar para Excel / Google Sheets", dlTop:"Top 250", dlCut:"Cortes de rating", dlMine:"Minhas partidas",
+  resetTitle:"Começar do zero", resetIntro:"Apaga a cópia do histórico salva neste navegador (o histórico compartilhado carrega de novo na próxima atualização). Sua key, amigos e partidas anotadas ficam.",
+  resetBtn:"Apagar histórico", resetConfirm:"Clique de novo para confirmar", resetDone:"Histórico apagado."
+});
+
+
+// ============================================================== helpers
+const SV = ["--s1","--s2","--s3","--s4","--s5"];
+let NOW, PROF, ROWS, ROW, WATCH;
+function rebind() {
+  NOW = Date.now() / 1000; PROF = D.profiles || {}; ROWS = D.players;
+  ROW = new Map(ROWS.map(p => [p[1], p])); WATCH = new Set(D.watch.map(w => w.toLowerCase()));
+}
+rebind();
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("gw2lw-" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("gw2lw-" + k, JSON.stringify(v)); } catch (e) {} }
+};
+let LANG = store.get("lang", (navigator.language || "en").slice(0, 2));
+if (!STR[LANG]) LANG = "en";
+const LI = () => LANG === "es" ? 1 : LANG === "pt" ? 2 : 0;          // index into [en,es,pt] arrays
+const LOC = () => LANG === "es" ? "es-AR" : LANG === "pt" ? "pt-BR" : "en-US";
+function t(k, v) {
+  let s = (STR[LANG] && STR[LANG][k]) ?? STR.en[k] ?? k;
+  if (v && typeof s === "string") s = s.replace(/\{(\w+)\}/g, (m, x) => v[x] ?? m);
+  return s;
+}
+const tr = (k, v) => { let s = (STR[LANG].reasons || {})[k] ?? STR.en.reasons[k]; return v ? s.replace(/\{(\w+)\}/g, (m, x) => v[x] ?? m) : s; };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago = ts => { const m = Math.max(0, Math.round((NOW - ts) / 60));
+  return m < 1 ? t("justNow") : m < 60 ? t("minAgo", {n: m}) : m < 1440 ? t("hAgo", {n: Math.round(m / 60)}) : t("dAgo", {n: Math.round(m / 1440)}); };
+const hhmm = ts => new Date(ts * 1000).toLocaleTimeString(LOC(), {hour: "numeric", minute: "2-digit"});
+const signed = v => v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : "±0";
+const pcls = v => v > 0 ? "up" : v < 0 ? "down" : "";
+const pct = (w, n) => n ? Math.round(w / n * 100) + "%" : "-";
+const plink = n => `<a class="plink" href="#p=${encodeURIComponent(n)}">${esc(n)}</a>`;
+const tile = (k, v, d) => `<div class="card tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d" title="${esc(d)}">${esc(d)}</div></div>`;
+const isWin = g => g.result === "Victory" || g.result === "Bye";
+const mapName = id => (D.maps || {})[String(id)] || `Map ${id}`;
+const division = r => r == null ? "-" : r >= 1800 ? "Legendary" : r >= 1500 ? "Platinum" : r >= 1200 ? "Gold" : r >= 900 ? "Silver" : "Bronze";
+const tsOf = s => Date.parse(s) / 1000;
+const rankedOf = games => (games || []).filter(g => g.rating_type === "Ranked" && (!g.season || g.season === D.seasonId));
+
+// ============================================================== line chart (step lines)
+function lineChart(box, series, o = {}) {
+  box.innerHTML = "";
+  series = series.filter(s => s.points && s.points.length);
+  if (!series.length) { box.innerHTML = `<div class="empty">${esc(o.empty || t("noData"))}</div>`; return; }
+  const tip = document.createElement("div"); tip.className = "tip"; box.appendChild(tip);
+  const W = box.clientWidth || 600, H = o.height || 260;
+  const labels = o.labels && W >= 600;
+  const m = {l: 46, r: labels ? 180 : 14, t: 12, b: 26};
+  const tEnd = Math.max(o.tEnd || D.updated, ...series.map(s => s.points[s.points.length - 1][0]));
+  let tMin = Math.min(...series.map(s => s.points[0][0]));
+  if (tEnd - tMin < 600) tMin = tEnd - 600;
+  const vals = series.flatMap(s => s.points.map(p => p[1])).filter(v => v != null);
+  if (o.yRef != null) vals.push(o.yRef);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = Math.max(10, (hi - lo) * 0.1); lo -= pad; hi += pad;
+  const step = [5,10,20,25,50,100,200].find(s => (hi - lo) / s <= 6) || 500;
+  lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+  const x = v => m.l + (v - tMin) / (tEnd - tMin) * (W - m.l - m.r);
+  const y = v => m.t + (hi - v) / (hi - lo) * (H - m.t - m.b);
+  const span = tEnd - tMin;
+  const fmtT = span > 86400 * 6 ? v => new Date(v * 1000).toLocaleDateString(LOC(), {month: "short", day: "numeric"})
+    : span > 3600 * 20 ? v => new Date(v * 1000).toLocaleString(LOC(), {weekday: "short", hour: "numeric"}) : hhmm;
+  let g = "";
+  for (let v = lo; v <= hi; v += step)
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v}</text>`;
+  const nx = Math.max(2, Math.min(6, Math.floor((W - m.l - m.r) / 110)));
+  for (let i = 0; i <= nx; i++) {
+    const v = tMin + span * i / nx;
+    g += `<text x="${x(v)}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === nx ? "end" : "middle"}" font-size="11" fill="var(--muted)">${esc(fmtT(v))}</text>`;
+  }
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}" stroke="var(--axis)"/>`;
+  if (o.yRef != null)
+    g += `<line x1="${m.l}" x2="${W - m.r}" y1="${y(o.yRef)}" y2="${y(o.yRef)}" stroke="var(--ink-2)" stroke-dasharray="4 4"/><text x="${m.l + 6}" y="${y(o.yRef) - 6}" font-size="11" fill="var(--ink-2)">${esc(o.yRefLabel || o.yRef)}</text>`;
+  const ends = [];
+  series.forEach((s, i) => {
+    const pts = s.points.filter(p => p[1] != null);
+    if (!pts.length) return;
+    let d = "";
+    pts.forEach((p, j) => { d += j === 0 ? `M${x(p[0])},${y(p[1])}` : `H${x(p[0])}V${y(p[1])}`; });
+    d += `H${x(tEnd)}`;
+    const col = s.color || `var(${SV[i % SV.length]})`;
+    g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+    if (pts.length <= 150 && !o.noDots) pts.forEach(p => g += `<circle cx="${x(p[0])}" cy="${y(p[1])}" r="3.5" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`);
+    ends.push({y: y(pts[pts.length - 1][1]), name: s.name, val: pts[pts.length - 1][1], col});
+  });
+  if (labels) {
+    ends.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 15) ends[i].y = ends[i - 1].y + 15;
+    ends.forEach(e => {
+      const nm = e.name.length > 17 ? e.name.slice(0, 16) + "…" : e.name;
+      g += `<circle cx="${W - m.r + 10}" cy="${e.y}" r="4" fill="${e.col}"/><text x="${W - m.r + 18}" y="${e.y + 4}" font-size="12" fill="var(--ink-2)">${esc(nm)} <tspan fill="var(--ink)" font-weight="600">${e.val}</tspan></text>`;
+    });
+  }
+  g += `<line class="xh" y1="${m.t}" y2="${H - m.b}" stroke="var(--axis)" stroke-dasharray="3 3" visibility="hidden"/>`;
+  g += `<rect class="hit" x="${m.l}" y="0" width="${Math.max(0, W - m.l - m.r)}" height="${H}" fill="transparent"/>`;
+  box.insertAdjacentHTML("afterbegin", `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(o.aria || "chart")}">${g}</svg>`);
+  const svg = box.querySelector("svg"), xh = svg.querySelector(".xh"), hit = svg.querySelector(".hit");
+  const valAt = (s, v) => { let r = null; for (const p of s.points) { if (p[0] <= v) r = p[1]; else break; } return r ?? s.points[0][1]; };
+  hit.addEventListener("mousemove", ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+    const v = tMin + (px - m.l) / (W - m.l - m.r) * span;
+    xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.setAttribute("visibility", "visible");
+    const rows = series.map((s, i) => ({n: s.name, v: valAt(s, v), c: s.color || `var(${SV[i % SV.length]})`})).filter(rw => rw.v != null).sort((a, b) => b.v - a.v);
+    tip.innerHTML = `<b>${esc(new Date(v * 1000).toLocaleString(LOC(), {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"}))}</b>` +
+      rows.map(rw => `<div><span><i style="background:${rw.c}"></i>${esc(rw.n)}</span><strong>${rw.v}</strong></div>`).join("");
+    tip.style.display = "block";
+    const tx = (ev.clientX - r.left) + 14, maxX = box.clientWidth - tip.offsetWidth - 4;
+    tip.style.left = Math.max(0, Math.min(tx, maxX)) + "px"; tip.style.top = "20px";
+  });
+  hit.addEventListener("mouseleave", () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); });
+}
+
+// ============================================================== tabs + header
+const TABS = [["overview","tabOverview"],["me","tabMe"],["friends","tabFriends"],["helper","tabHelper"],["learn","tabLearn"],["archive","tabArchive"]];
+let TAB = store.get("tab", "overview");
+if (!TABS.some(x => x[0] === TAB)) TAB = "overview";
+function renderTabs() {
+  $("tabs").innerHTML = TABS.map(([id, k]) => `<button role="tab" id="tb-${id}" aria-selected="${id === TAB}" aria-controls="tab-${id}" data-tab="${id}">${esc(t(k))}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach(b => b.addEventListener("click", () => { TAB = b.dataset.tab; store.set("tab", TAB); showTab(); }));
+  TABS.forEach(([id]) => $("tab-" + id).classList.toggle("on", id === TAB));
+}
+function showTab() { renderTabs(); drawVisible(); }
+function renderHeader() {
+  const staleMin = (NOW - D.updated) / 60;
+  $("meta").innerHTML = `${esc(D.season)} · ${esc(D.region)} · ${esc(t("updated"))} ${hhmm(D.updated)}` +
+    (staleMin > Math.max(5, 3 * D.interval / 60) ? ` · <span class="stale">${esc(t("notRunning"))}</span>` : "");
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-t]").forEach(e => e.innerHTML = t(e.dataset.t));
+  document.querySelectorAll("[data-tp]").forEach(e => { e.placeholder = t(e.dataset.tp); e.setAttribute("aria-label", t(e.dataset.tp)); });
+  $("lang").value = LANG;
+}
+
+// ============================================================== player stats from recorded results
+function pstats(n) {
+  const r = (PROF[n] && PROF[n].r) || [];
+  let streak = 0, kind = null;
+  for (let i = r.length - 1; i >= 0; i--) {
+    const [, dw, dl] = r[i]; const k = dw && !dl ? "W" : dl && !dw ? "L" : null;
+    if (!k || (kind && k !== kind)) break;
+    kind = k; streak += k === "W" ? dw : dl;
+  }
+  let net = 0, games = 0;
+  for (const x of r) if (x[0] >= NOW - 86400) { net += x[4]; games += x[1] + x[2]; }
+  return {streak, kind, net, games};
+}
+function gameStreak(ranked) {
+  let n = 0, kind = null;
+  for (let i = ranked.length - 1; i >= 0; i--) { const k = isWin(ranked[i]) ? "W" : "L"; if (kind && k !== kind) break; kind = k; n++; }
+  return {n, kind};
+}
+
+// ============================================================== OVERVIEW
+function renderOverview() {
+  const activeCut = NOW - D.activeWindow * 60;
+  const activeNow = ROWS.filter(p => p[5] && p[5] >= activeCut);
+  const matches = D.events.filter(e => e.type === "match").reduce((a, e) => a + e.dw + e.dl, 0);
+  const leader = ROWS[0], last = ROWS[ROWS.length - 1];
+  $("tiles").innerHTML = [
+    tile(t("top1"), leader ? leader[2] : "-", leader ? `${leader[1]} · ${leader[3]}-${leader[4]}` : t("noData")),
+    tile(t("cutoff250"), last ? last[2] : "-", last ? t("rankN", {n: last[0]}) : t("noData")),
+    tile(t("activeN", {n: D.activeWindow}), activeNow.length, activeNow.slice(0, 3).map(p => p[1]).join(", ") || t("nobodyYet")),
+    tile(t("matchesSeen"), matches, t("lastEvents", {n: D.events.length})),
+  ].join("");
+
+  const all = ROWS.map(p => ({n: p[1], ...pstats(p[1])}));
+  const box = (title, items, fmt, emptyTxt) => `<div class="card"><h2>${esc(title)}</h2>${items.length
+    ? `<ul class="list">${items.map(it => `<li><span class="n">${plink(it.n)}</span><span class="v">${fmt(it)}</span></li>`).join("")}</ul>`
+    : `<div class="empty">${esc(emptyTxt)}</div>`}</div>`;
+  const hot = all.filter(a => a.kind === "W" && a.streak >= 2).sort((a, b) => b.streak - a.streak).slice(0, 5);
+  const cold = all.filter(a => a.kind === "L" && a.streak >= 2).sort((a, b) => b.streak - a.streak).slice(0, 5);
+  const gain = all.filter(a => a.net > 0).sort((a, b) => b.net - a.net).slice(0, 5);
+  const drop = all.filter(a => a.net < 0).sort((a, b) => a.net - b.net).slice(0, 5);
+  $("hot").innerHTML =
+    box(t("onFire"), hot, a => `<span class="up">${esc(t("wStreak", {n: a.streak}))}</span>`, t("noWinStreaks")) +
+    box(t("cold"), cold, a => `<span class="down">${esc(t("lStreak", {n: a.streak}))}</span>`, t("noLossStreaks")) +
+    box(t("gains24"), gain, a => `<span class="up">${signed(a.net)}</span>`, t("noGains")) +
+    box(t("drops24"), drop, a => `<span class="down">${signed(a.net)}</span>`, t("noDrops"));
+
+  $("feed").innerHTML = D.events.length ? D.events.map(e => {
+    let tag, detail;
+    if (e.type === "new") { tag = `<span class="tag">${t("tagNew")}</span>`; detail = `${esc(t("entered", {n: e.rank}))} · ${e.rating}`; }
+    else if (e.type === "left") { tag = `<span class="tag">${t("tagOut")}</span>`; detail = esc(t("was", {n: e.rank_before})); }
+    else {
+      const win = e.dw && !e.dl, loss = e.dl && !e.dw, dlt = e.rating - e.rating_before;
+      tag = `<span class="tag ${win ? "w" : loss ? "l" : ""}">${t(win ? "tagWon" : loss ? "tagLost" : "tagMixed")}</span>`;
+      detail = `<span class="${pcls(dlt)}">${signed(dlt)}</span> → ${e.rating}` + (e.rank !== e.rank_before ? ` · #${e.rank_before}→#${e.rank}` : ` · #${e.rank}`);
+    }
+    return `<li>${tag}<span class="n">${plink(e.name)}</span><span class="m">${detail} · ${esc(ago(e.ts))}</span></li>`;
+  }).join("") : `<li class="empty">${esc(t("noMatches"))}</li>`;
+  drawTable();
+}
+function drawTable() {
+  const activeCut = NOW - D.activeWindow * 60;
+  const q = store.get("q", "");
+  $("q").value = q;
+  const ql = q.toLowerCase();
+  const rows = ROWS.filter(p => !ql || p[1].toLowerCase().includes(ql));
+  $("tbl").innerHTML = `<thead><tr><th class="num">#</th><th>${esc(t("player"))}</th><th class="num">${esc(t("rating"))}</th><th class="num">${esc(t("wl"))}</th><th class="num">${esc(t("winRate"))}</th><th>${esc(t("lastMatch"))}</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(p => {
+      const act = p[5] ? `${p[5] >= activeCut ? `<span class="dot" title="${esc(t("active"))}"></span>` : ""}${esc(ago(p[5]))}` : `<span style="color:var(--muted)">${esc(t("notSeen"))}</span>`;
+      return `<tr class="${WATCH.has(p[1].toLowerCase()) ? "watched" : ""}"><td class="num">${p[0]}</td><td>${plink(p[1])}</td><td class="num">${p[2]}</td><td class="num">${p[3]}-${p[4]}</td><td class="num">${pct(p[3], p[3] + p[4])}</td><td>${act}</td></tr>`;
+    }).join("") : `<tr><td colspan="6" class="empty">${esc(t("noPlayers"))}</td></tr>`) + "</tbody>";
+}
+$("q").addEventListener("input", e => { store.set("q", e.target.value); drawTable(); });
+
+function drawTop() {
+  const series = D.series.filter(s => s.points.length);
+  $("chartTitle").textContent = D.watch.length ? t("followRating") : t("topRating", {n: series.length});
+  $("legend").innerHTML = series.map((s, i) => `<span><i style="background:var(${SV[i]})"></i>${plink(s.name)}</span>`).join("");
+  lineChart($("chartbox"), series, {height: 280, labels: true, empty: t("noHistory")});
+}
+function drawCutoffs() {
+  const C = D.cutoffs || [], R = D.cutoffRanks;
+  const series = R.map((rk, i) => ({name: `#${rk}`, points: C.map(c => [c[0], c[i + 1]]).filter(p => p[1] != null)})).reverse();
+  $("cutLegend").innerHTML = series.map((s, i) => `<span><i style="background:var(${SV[i]})"></i>${esc(s.name)}</span>`).join("");
+  lineChart($("cutbox"), series, {height: 240, labels: true, noDots: true, empty: t("noHistory"), aria: t("cutoffsTitle")});
+  if (!C.length) { $("cutInsight").textContent = ""; return; }
+  const lastC = C[C.length - 1], firstC = C[0], idx = R.indexOf(250) + 1;
+  const r = lastC[idx], days = (lastC[0] - firstC[0]) / 86400, end = D.seasonEnd ? tsOf(D.seasonEnd) : null;
+  if (days >= 1 && end && end > NOW && firstC[idx] != null) {
+    const slope = (r - firstC[idx]) / days, proj = Math.round(r + slope * (end - NOW) / 86400);
+    $("cutInsight").innerHTML = t("cutInsight", {r, d: signed(r - firstC[idx]), p: proj});
+  } else $("cutInsight").innerHTML = t("cutInsightNoPace", {r});
+}
+function drawHeat() {
+  const box = $("heatbox"), dayName = d => new Date(2026, 0, 5 + d).toLocaleDateString(LOC(), {weekday: "short"});
+  const cell = ts => { const d = new Date(ts * 1000); return ((d.getDay() + 6) % 7) * 24 + d.getHours(); };
+  const sum = {}, obs = {};
+  for (const [b, c] of Object.entries(D.heat.counts)) { const k = cell(+b); sum[k] = (sum[k] || 0) + c; }
+  for (const [b, c] of Object.entries(D.heat.observed)) { const k = cell(+b); obs[k] = (obs[k] || 0) + Math.min(1, c / 3600); }
+  const avg = {}; let max = 0, best = null, hours = 0;
+  for (const k in obs) { hours += obs[k]; if (obs[k] >= 0.25) { avg[k] = (sum[k] || 0) / obs[k]; if (avg[k] > max) { max = avg[k]; best = +k; } } }
+  const hName = h => new Date(2026, 0, 1, h).toLocaleTimeString(LOC(), {hour: "numeric"});
+  $("heatInsight").innerHTML = best == null ? esc(t("heatEmpty"))
+    : t("heatBusiest", {when: `${dayName(Math.floor(best / 24))} ${hName(best % 24)}`, n: Math.round(max), h: Math.round(hours)}) + (hours < 24 ? t("heatEarly") : "");
+  const W = box.clientWidth || 600, lab = 40, top0 = 18, gap = 2;
+  const cw = (W - lab) / 24, ch = W < 600 ? 18 : 22, H = top0 + 7 * ch;
+  let g = "";
+  for (let h = 0; h < 24; h += 3) g += `<text x="${lab + h * cw + cw / 2}" y="12" text-anchor="middle" font-size="10" fill="var(--muted)">${esc(hName(h).replace(/\s/g, ""))}</text>`;
+  for (let d = 0; d < 7; d++) {
+    g += `<text x="0" y="${top0 + d * ch + ch / 2 + 4}" font-size="11" fill="var(--muted)">${esc(dayName(d))}</text>`;
+    for (let h = 0; h < 24; h++) {
+      const k = d * 24 + h, seen = avg[k] != null, op = seen ? (max ? 0.14 + 0.86 * avg[k] / max : 0.14) : 1;
+      g += `<rect class="hc" data-k="${k}" x="${lab + h * cw + gap / 2}" y="${top0 + d * ch + gap / 2}" width="${Math.max(1, cw - gap)}" height="${ch - gap}" rx="3" fill="${seen ? "var(--s1)" : "var(--chip)"}" fill-opacity="${op.toFixed(3)}"/>`;
+    }
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(t("peakTitle"))}">${g}</svg><div class="tip"></div>`;
+  const tip = box.querySelector(".tip");
+  box.querySelectorAll(".hc").forEach(rc => {
+    rc.addEventListener("mouseenter", () => {
+      const k = +rc.dataset.k;
+      tip.innerHTML = `<b>${esc(dayName(Math.floor(k / 24)))} ${esc(hName(k % 24))}</b>` + (avg[k] != null
+        ? `<div><span>${esc(t("avgPerHour"))}</span><strong>${avg[k].toFixed(1)}</strong></div><div><span>${esc(t("hoursWatched"))}</span><strong>${obs[k].toFixed(1)}</strong></div>`
+        : `<div><span>${esc(t("notWatched"))}</span></div>`);
+      tip.style.display = "block";
+      const bb = rc.getBBox(), sc = box.clientWidth / W;
+      tip.style.left = Math.max(0, Math.min((bb.x + bb.width) * sc + 8, box.clientWidth - tip.offsetWidth - 4)) + "px";
+      tip.style.top = Math.max(0, bb.y * sc - 10) + "px";
+    });
+    rc.addEventListener("mouseleave", () => tip.style.display = "none");
+  });
+  return {avg, obs};
+}
+
+// ============================================================== MY STATS
+function groupTable(games, keyFn, label) {
+  const g = {};
+  games.forEach(x => { const k = keyFn(x); const r = g[k] || (g[k] = {k, n: 0, w: 0, net: 0}); r.n++; if (isWin(x)) r.w++; r.net += x.rating_change || 0; });
+  const rows = Object.values(g).sort((a, b) => b.n - a.n || b.w / b.n - a.w / a.n);
+  return {rows, html: `<table><thead><tr><th>${esc(label)}</th><th class="num">${esc(t("gamesCol"))}</th><th class="num">${esc(t("wl"))}</th><th class="num">${esc(t("winRate"))}</th><th class="num">${esc(t("ratingCol"))}</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${esc(r.k)}</td><td class="num">${r.n}</td><td class="num">${r.w}-${r.n - r.w}</td><td class="num">${pct(r.w, r.n)}</td><td class="num ${pcls(r.net)}">${signed(r.net)}</td></tr>`).join("") + "</tbody></table>"};
+}
+function ratingPoints(person) {
+  const ranked = rankedOf(person.games), r = person.rating;
+  if (r != null && ranked.length) {
+    let cur = r; const tmp = [];
+    for (let i = ranked.length - 1; i >= 0; i--) { tmp.push([tsOf(ranked[i].ended), cur]); cur -= ranked[i].rating_change || 0; }
+    tmp.push([tsOf(ranked[0].started), cur]);
+    return tmp.reverse();
+  }
+  return person.ratings || [];
+}
+function sessions(ranked) {
+  const out = []; let curS = null;
+  ranked.forEach(g => { const st = tsOf(g.started), en = tsOf(g.ended);
+    if (!curS || st - curS.end > 45 * 60) { curS = {start: st, end: en, games: []}; out.push(curS); }
+    curS.games.push(g); curS.end = en; });
+  return out;
+}
+const BLOCKS = [[0,4],[4,8],[8,12],[12,16],[16,20],[20,24]];
+const blockName = b => { const f = h => new Date(2026, 0, 1, h % 24).toLocaleTimeString(LOC(), {hour: "numeric"}); return `${f(b[0])}–${f(b[1])}`; };
+
+function renderMe() {
+  const sec = $("tab-me");
+  if (!D.me) {
+    sec.innerHTML = `<div class="card"><h2>${esc(t("meTitle"))}</h2><p class="insight">${D.hasKey ? t("meKeySaved") : t("meNeedKey")}</p>${D.hasKey ? "" :
+      `<ol class="steps"><li>${t("keyStep1")}</li><li>${t("keyStep2")}</li><li>${t("keyStep3")}</li></ol>`}</div>`;
+    return;
+  }
+  const me = D.me, games = me.games || [], ranked = rankedOf(games);
+  const w = ranked.filter(isWin).length, n = ranked.length, r = me.rating;
+  const goals = store.get("goals", {games: 5, target: 1500});
+  const target = +goals.target || 1500;
+  const st = gameStreak(ranked);
+  const byClass = groupTable(ranked, g => g.profession || "?", t("klass"));
+  const byMap = groupTable(ranked, g => mapName(g.map_id), t("map"));
+  const best = byClass.rows.filter(x => x.n >= 3).sort((a, b) => b.w / b.n - a.w / a.n)[0];
+  const worstMap = byMap.rows.filter(x => x.n >= 3).sort((a, b) => a.w / a.n - b.w / b.n)[0];
+  const tips = [];
+  if (best) tips.push(t("bestClass", {c: esc(best.k), p: pct(best.w, best.n), n: best.n}));
+  if (worstMap) tips.push(t("toughMap", {c: esc(worstMap.k), p: pct(worstMap.w, worstMap.n), n: worstMap.n}));
+
+  // tilt (6)
+  const tilt = st.kind === "L" && st.n >= 2 && (NOW - tsOf(ranked[ranked.length - 1].ended)) < 3 * 3600;
+  // sessions + goals (7)
+  const ss = sessions(ranked), lastS = ss[ss.length - 1];
+  const sessionActive = lastS && NOW - lastS.end < 45 * 60;
+  const sGames = sessionActive ? lastS.games.length : 0;
+  const sNet = sessionActive ? lastS.games.reduce((a, g) => a + (g.rating_change || 0), 0) : 0;
+  // calculator (8)
+  const wins = ranked.filter(g => isWin(g) && g.rating_change > 0), losses = ranked.filter(g => !isWin(g) && g.rating_change < 0);
+  const avgW = wins.length ? wins.reduce((a, g) => a + g.rating_change, 0) / wins.length : null;
+  const avgL = losses.length ? -losses.reduce((a, g) => a + g.rating_change, 0) / losses.length : null;
+  let calc;
+  if (r == null || n < 3 || avgW == null || avgL == null) calc = `<p class="insight">${esc(t("calcNoData"))}</p>`;
+  else if (r >= target) calc = `<p class="insight">${esc(t("calcDone", {t: target}))}</p>`;
+  else {
+    const wr = w / n, deficit = target - r, net = Math.ceil(deficit / avgW), per = wr * avgW - (1 - wr) * avgL;
+    calc = `<p class="insight">${t("calcAvg", {w: Math.round(avgW), l: Math.round(avgL)})}</p><p class="insight">${t("calcNet", {t: target, n: net})}</p>` +
+      (per > 0.5 ? `<p class="insight">${t("calcPace", {wr: pct(w, n), g: Math.ceil(deficit / per)})}</p>`
+                 : `<p class="insight">${t("calcDown", {wr: pct(w, n), need: Math.ceil(avgL / (avgW + avgL) * 100) + "%"})}</p>`);
+  }
+  // best hours (9)
+  const hb = BLOCKS.map(b => ({b, n: 0, w: 0}));
+  ranked.forEach(g => { const h = new Date(tsOf(g.started) * 1000).getHours(); const x = hb.find(q => h >= q.b[0] && h < q.b[1]); x.n++; if (isWin(g)) x.w++; });
+  const bestB = hb.filter(x => x.n >= 3).sort((a, b) => b.w / b.n - a.w / a.n)[0];
+  // season (10)
+  const end = D.seasonEnd ? tsOf(D.seasonEnd) : null;
+  const dFmt = s => new Date(s * 1000).toLocaleDateString(LOC(), {day: "numeric", month: "long"});
+  const inTxt = end ? (end - NOW > 86400 ? t("inD", {n: Math.ceil((end - NOW) / 86400)}) : t("inH", {n: Math.max(1, Math.ceil((end - NOW) / 3600))})) : "";
+  const lastR = ranked.length ? ranked[ranked.length - 1] : null;
+
+  const recent = [...games].reverse().slice(0, 10);
+  sec.innerHTML = `
+    <h2 style="margin:4px 0 10px">${esc(t("meTitle"))} · ${esc(me.account)}</h2>
+    <div class="tiles">
+      ${tile(t("myRating"), r ?? "-", r == null ? t("notThisSeason") : division(r))}
+      ${tile(t("toTarget", {t: target}), r == null ? "-" : r >= target ? t("done") : target - r, r == null ? "" : r >= target ? t("madeIt") : t("pointsToGo"))}
+      ${tile(t("rankedRecord"), `${w}-${n - w}`, t("recordedThisSeason", {n}))}
+      ${tile(t("winRate"), pct(w, n), st.n >= 2 ? t("streakText", {n: st.n, k: st.kind === "W" ? t("winWord") : t("lossWord")}) : t("recorded"))}
+    </div>
+    <div class="grid3 section">
+      <div class="card"><h2>${esc(t("tiltTitle"))}</h2><p class="insight">${tilt ? t("tiltMsg", {n: st.n}) : esc(t("tiltOk"))}</p></div>
+      <div class="card"><h2>${esc(t("goalsTitle"))}</h2>
+        <div class="row">
+          <label class="field">${esc(t("goalGames"))}<input type="number" id="gGames" min="1" max="50" value="${+goals.games || 5}" style="width:90px"></label>
+          <label class="field">${esc(t("goalTarget"))}<input type="number" id="gTarget" min="0" max="3000" step="10" value="${target}" style="width:110px"></label>
+        </div>
+        ${sessionActive ? `<div class="bar" aria-hidden="true"><i style="width:${Math.min(100, sGames / (+goals.games || 5) * 100)}%"></i></div>
+          <div class="note">${esc(t("sessionNow", {n: sGames, g: +goals.games || 5, d: signed(sNet)}))}</div>${sGames >= (+goals.games || 5) ? `<p class="insight" style="margin-top:6px"><b>${esc(t("goalReached"))}</b></p>` : ""}`
+          : `<div class="note">${esc(t("sessionNone"))}</div>`}
+      </div>
+      <div class="card"><h2>${esc(t("calcTitle"))}</h2>${calc}</div>
+    </div>
+    <div class="card section">
+      <h2>${esc(t("myRatingChart"))}</h2>
+      ${tips.length ? `<p class="insight">${tips.join(" · ")}</p>` : ""}
+      <div class="chartbox" id="mechart"></div>
+    </div>
+    <div class="grid2 section">
+      <div class="card"><h2>${esc(t("byClass"))}</h2>${n ? `<div class="tscroll">${byClass.html}</div>` : `<div class="empty">${esc(t("noRanked"))}</div>`}<div class="note">${esc(t("baseClassNote"))}</div></div>
+      <div class="card"><h2>${esc(t("byMap"))}</h2>${n ? `<div class="tscroll">${byMap.html}</div>` : `<div class="empty">${esc(t("noRanked"))}</div>`}</div>
+    </div>
+    <div class="grid2 section">
+      <div class="card"><h2>${esc(t("hoursTitle"))}</h2>
+        <p class="insight">${bestB ? t("hoursInsight", {b: esc(blockName(bestB.b)), p: pct(bestB.w, bestB.n), n: bestB.n}) : esc(t("hoursNoData"))}</p>
+        <div class="tscroll"><table><thead><tr><th>${esc(t("block"))}</th><th class="num">${esc(t("gamesCol"))}</th><th class="num">${esc(t("winRate"))}</th><th>${esc(t("queueBusy"))}</th></tr></thead><tbody id="hoursBody"></tbody></table></div>
+      </div>
+      <div class="card"><h2>${esc(t("seasonTitle"))}</h2>
+        <p class="insight">${end ? (end > NOW ? t("seasonEnds", {d: esc(dFmt(end)), in: esc(inTxt)}) : esc(t("seasonEnded", {d: dFmt(end)}))) : ""}</p>
+        <p class="insight">${lastR ? t("lastRanked", {t: esc(ago(tsOf(lastR.ended)))}) : esc(t("noRankedYet"))}</p>
+        <div class="note">${esc(t("decayNote"))}</div>
+      </div>
+    </div>
+    <div class="card section">
+      <h2>${esc(t("lastGames"))}</h2>
+      ${recent.length ? `<ul class="list">${recent.map(g => {
+        const us = (g.team || "").toLowerCase(), sc = g.scores || {}, them = us === "red" ? "blue" : "red";
+        const score = sc[us] != null ? `${sc[us]}–${sc[them]}` : "", d = g.rating_change || 0;
+        return `<li><span class="n"><span class="tag ${isWin(g) ? "w" : "l"}">${esc(g.result || "?")}</span> ${esc(mapName(g.map_id))} · ${esc(g.profession || "?")}${g.rating_type !== "Ranked" ? ` · <span class="m">${esc(g.rating_type || "")}</span>` : ""}</span>
+          <span class="m">${score}${g.rating_type === "Ranked" ? ` · <span class="${pcls(d)}">${signed(d)}</span>` : ""} · ${esc(ago(tsOf(g.ended)))}</span></li>`; }).join("")}</ul>`
+        : `<div class="empty">${esc(t("noGamesYet"))}</div>`}
+      <div class="note">${esc(t("last10Note"))}</div>
+    </div>`;
+  const save = () => { store.set("goals", {games: +$("gGames").value || 5, target: +$("gTarget").value || 1500}); renderMe(); drawMe(); renderTilt(); };
+  $("gGames").addEventListener("change", save); $("gTarget").addEventListener("change", save);
+  ME_HB = hb;
+}
+let ME_HB = null;
+function drawMe() {
+  if (!D.me || !$("mechart")) return;
+  const goals = store.get("goals", {games: 5, target: 1500});
+  lineChart($("mechart"), [{name: D.me.account, points: ratingPoints(D.me)}], {height: 240, yRef: +goals.target || 1500, yRefLabel: String(+goals.target || 1500), empty: t("ratingEmpty")});
+  if (ME_HB && $("hoursBody")) {
+    const heat = heatByBlock();
+    $("hoursBody").innerHTML = ME_HB.map((x, i) => `<tr><td>${esc(blockName(x.b))}</td><td class="num">${x.n}</td><td class="num">${pct(x.w, x.n)}</td>
+      <td><div class="bar" style="width:72px"><i style="width:${heat[i]}%"></i></div></td></tr>`).join("");
+  }
+}
+function heatByBlock() {
+  const sum = Array(6).fill(0), obs = Array(6).fill(0);
+  const bi = ts => Math.floor(new Date(ts * 1000).getHours() / 4);
+  for (const [b, c] of Object.entries(D.heat.counts)) sum[bi(+b)] += c;
+  for (const [b, c] of Object.entries(D.heat.observed)) obs[bi(+b)] += Math.min(1, c / 3600);
+  const avg = sum.map((s, i) => obs[i] ? s / obs[i] : 0), mx = Math.max(...avg, 0.0001);
+  return avg.map(a => Math.round(a / mx * 100));
+}
+function renderTilt() {
+  const box = $("tiltBanner");
+  if (!D.me) { box.innerHTML = ""; return; }
+  const ranked = rankedOf(D.me.games), st = gameStreak(ranked);
+  const lastEnd = ranked.length ? tsOf(ranked[ranked.length - 1].ended) : 0;
+  const key = ranked.length ? ranked[ranked.length - 1].ended : "";
+  if (st.kind === "L" && st.n >= 2 && NOW - lastEnd < 3 * 3600 && store.get("tiltDismissed", "") !== key) {
+    box.innerHTML = `<div class="banner" role="status"><span>${t("tiltMsg", {n: st.n})}</span><button id="tiltOk">${esc(t("dismiss"))}</button></div>`;
+    $("tiltOk").addEventListener("click", () => { store.set("tiltDismissed", key); renderTilt(); });
+  } else box.innerHTML = "";
+}
+
+// ============================================================== FRIENDS
+function renderFriends() {
+  const sec = $("tab-friends"), F = D.friends || [];
+  const rows = F.map(f => {
+    const ranked = rankedOf(f.games), w = ranked.filter(isWin).length, st = gameStreak(ranked);
+    const cls = {}; ranked.forEach(g => { const c = cls[g.profession] || (cls[g.profession] = {n: 0, w: 0}); c.n++; if (isWin(g)) c.w++; });
+    const bc = Object.entries(cls).filter(([, v]) => v.n >= 3).sort((a, b) => b[1].w / b[1].n - a[1].w / a[1].n)[0];
+    const lastG = (f.games || []).length ? f.games[f.games.length - 1] : null;
+    return {f, w, n: ranked.length, st, bc, lastG};
+  }).sort((a, b) => (b.f.rating ?? -1) - (a.f.rating ?? -1));
+  sec.innerHTML = `
+    <div class="card"><h2>${esc(t("friendsTitle"))}</h2><p class="insight">${t("friendsIntro")}</p><p class="insight">${t("friendsHow")}</p></div>
+    ${rows.length ? `
+    <div class="card section"><div class="tscroll"><table><thead><tr><th>${esc(t("friendCol"))}</th><th class="num">${esc(t("rating"))}</th><th>${esc(t("division"))}</th><th class="num">${esc(t("recordCol"))}</th><th class="num">${esc(t("winRate"))}</th><th>${esc(t("streak"))}</th><th>${esc(t("bestClassCol"))}</th><th>${esc(t("lastMatch"))}</th></tr></thead><tbody>
+      ${rows.map(x => `<tr><td>${esc(x.f.account)}${x.f.error ? ` <span class="tag l">${esc(t("keyProblem"))}</span>` : ""}</td><td class="num">${x.f.rating ?? "-"}</td><td>${esc(division(x.f.rating))}</td>
+        <td class="num">${x.w}-${x.n - x.w}</td><td class="num">${pct(x.w, x.n)}</td>
+        <td>${x.st.n >= 2 ? `<span class="${x.st.kind === "W" ? "up" : "down"}">${esc(t(x.st.kind === "W" ? "wStreak" : "lStreak", {n: x.st.n}))}</span>` : "-"}</td>
+        <td>${x.bc ? `${esc(x.bc[0])} ${pct(x.bc[1].w, x.bc[1].n)}` : "-"}</td><td>${x.lastG ? esc(ago(tsOf(x.lastG.ended))) : "-"}</td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div class="card section"><h2>${esc(t("friendsChart"))}</h2><div class="legend" id="frLegend"></div><div class="chartbox" id="frchart"></div><div class="note">${esc(t("friendsChartNote"))}</div></div>`
+    : `<div class="card section"><div class="empty">${esc(t("friendsNone"))}</div></div>`}`;
+}
+function drawFriends() {
+  if (!$("frchart")) return;
+  const F = [...(D.friends || [])].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1)).slice(0, 5);
+  const series = F.map(f => ({name: f.account, points: ratingPoints(f)}));
+  $("frLegend").innerHTML = series.map((s, i) => `<span><i style="background:var(${SV[i]})"></i>${esc(s.name)}</span>`).join("");
+  lineChart($("frchart"), series, {height: 240, labels: true, empty: t("noHistory")});
+}
+
+// ============================================================== MATCH HELPER (17 + 18)
+const SPEC = new Map(SPECS.map(s => [s[0], {prof: s[1], role: s[2]}]));
+const RANGED = new Set(["Galeshot", "Deadeye"]);
+const SQUISHY = ["Elementalist","Weaver","Catalyst","Evoker","Thief","Daredevil","Deadeye","Antiquary","Mesmer","Mirage","Virtuoso","Galeshot","Soulbeast","Holosmith"];
+function emptyComp() { return {ally: Array(4).fill(null).map(() => ({s: "", r: ""})), enemy: Array(5).fill(null).map(() => ({s: "", r: ""})), pick: "", map: ""}; }
+let COMP = store.get("comp", emptyComp());
+const roleOf = x => x.r || (SPEC.get(x.s) || {}).role || "";
+function specSelect(team, i, x) {
+  const groups = {}; SPECS.forEach(s => (groups[s[1]] = groups[s[1]] || []).push(s[0]));
+  return `<div class="slot"><span class="idx">${i + 1}</span>
+    <select data-team="${team}" data-i="${i}" data-f="s" aria-label="${esc(t(team === "ally" ? "yourTeam" : "enemyTeam"))} ${i + 1}">
+      <option value="">${esc(t("empty"))}</option>${Object.entries(groups).map(([p, l]) => `<optgroup label="${p}">${l.map(s => `<option ${x.s === s ? "selected" : ""}>${s}</option>`).join("")}</optgroup>`).join("")}
+    </select>
+    <select data-team="${team}" data-i="${i}" data-f="r" aria-label="${esc(t("roleCol"))}" ${x.s ? "" : "disabled"}>
+      ${Object.entries(t("roles")).map(([k, v]) => `<option value="${k}" ${roleOf(x) === k ? "selected" : ""}>${esc(v)}</option>`).join("")}
+    </select></div>`;
+}
+function suggest() {
+  const enemy = COMP.enemy.filter(x => x.s), ally = COMP.ally.filter(x => x.s);
+  const eRole = k => enemy.filter(x => roleOf(x) === k).length, aRole = k => ally.filter(x => roleOf(x) === k).length;
+  const eCondi = eRole("condi"), eSup = eRole("support") + eRole("bunker"), eSquishy = enemy.filter(x => ["dps", "roamer"].includes(roleOf(x)) && SQUISHY.includes(x.s)).length;
+  const eNecro = enemy.filter(x => (SPEC.get(x.s) || {}).prof === "Necromancer").length;
+  const aNecro = ally.filter(x => (SPEC.get(x.s) || {}).prof === "Necromancer").length;
+  const aFront = aRole("dps") + aRole("condi") + aRole("bunker"), aSup = aRole("support");
+  const ranged = enemy.filter(x => RANGED.has(x.s)).map(x => x.s);
+  const enabled = store.get("cands", CANDS.map(c => c.id));
+  return CANDS.filter(c => enabled.includes(c.id)).map(c => {
+    let s = c.base; const why = [];
+    const add = (v, k, p) => { s += v; why.push({v, txt: tr(k, p)}); };
+    if (c.id === "reaper") why.push({v: 0, txt: tr("base")});
+    if (eCondi >= 2) {
+      if (c.id === "ritualist") add(3, "condiR", {n: eCondi});
+      if (c.id === "reaper") add(1, "condiR", {n: eCondi});
+      if (["virtuoso", "conduitP"].includes(c.id)) add(c.id === "virtuoso" ? -3 : -2, "condiBad", {n: eCondi});
+      if (c.id === "luminary") add(-1, "condiBad", {n: eCondi});
+    }
+    if (eSup >= 1 && c.id === "reaper") add(eSup >= 2 ? 3 : 2, "supR", {n: eSup});
+    if (eSup >= 2 && c.id === "virtuoso") s -= 1;
+    if (ally.length && aFront <= 1) {
+      if (c.id === "conduitC") add(2, "noFront");
+      if (["reaper", "ritualist"].includes(c.id)) add(1, "noFront");
+      if (c.id === "virtuoso") s -= 1;
+    }
+    if (aNecro >= 1 && ["reaper", "ritualist"].includes(c.id)) add(aNecro >= 2 ? -3 : -1, "stack", {n: aNecro});
+    if (eSquishy >= 2 && eCondi <= 1 && c.id === "virtuoso") add(2, "glass");
+    if (ranged.length && c.id === "reaper") add(1, "ranged", {s: [...new Set(ranged)].join(", ")});
+    if (aSup >= 1 && c.id === "reaper") add(1, "withSup");
+    if (eNecro >= 2 && c.id === "luminary") add(-2, "corrupt", {n: eNecro});
+    return {c, s, why};
+  }).sort((a, b) => b.s - a.s);
+}
+function focusTip() {
+  const enemy = COMP.enemy.filter(x => x.s);
+  if (!enemy.length) return esc(t("focusNone"));
+  const sup = enemy.find(x => roleOf(x) === "support");
+  if (sup) return t("focusSupport", {s: esc(sup.s)});
+  const sq = enemy.find(x => SQUISHY.includes(x.s)) || enemy[0];
+  return t("focusSquishy", {s: esc(sq.s)});
+}
+function openingTip() {
+  const roam = COMP.ally.filter(x => x.s && roleOf(x) === "roamer").length;
+  return esc(roam ? t("openRoam", {n: roam}) : t("openMid"));
+}
+function renderHelper() {
+  const sec = $("tab-helper"), enabled = store.get("cands", CANDS.map(c => c.id));
+  const res = suggest(), log = store.get("log", []);
+  const mapsList = MAPS.map(mp => mp.name);
+  sec.innerHTML = `
+    <div class="card"><h2>${esc(t("helperTitle"))}</h2><p class="insight">${esc(t("helperIntro"))}</p>
+      <div class="grid2">
+        <div><h3>${esc(t("yourTeam"))} <span class="m">(+ ${esc(t("you"))})</span></h3><div class="slots">${COMP.ally.map((x, i) => specSelect("ally", i, x)).join("")}</div></div>
+        <div><h3>${esc(t("enemyTeam"))}</h3><div class="slots">${COMP.enemy.map((x, i) => specSelect("enemy", i, x)).join("")}</div></div>
+      </div>
+      <div class="row" style="margin-top:10px"><button id="clearComp">${esc(t("clearAll"))}</button></div>
+    </div>
+    <div class="grid2 section">
+      <div class="card"><h2>${esc(t("suggest"))}</h2>
+        ${res.slice(0, 3).map((x, i) => `<div class="reco ${i === 0 ? "best" : ""}"><div class="h"><span>${i + 1}. ${esc(x.c.name)}</span><span class="m">${x.s}</span></div>
+          ${x.why.length ? `<ul>${x.why.map(w => `<li>${w.v > 0 ? "▲ " : w.v < 0 ? "▼ " : ""}${esc(w.txt)}</li>`).join("")}</ul>` : ""}</div>`).join("")}
+        <details style="margin-top:8px"><summary>${esc(t("myBuilds"))}</summary><div class="row" style="margin-top:6px">
+          ${CANDS.map(c => `<label class="row" style="gap:4px"><input type="checkbox" data-cand="${c.id}" ${enabled.includes(c.id) ? "checked" : ""}> ${esc(c.name)}</label>`).join("")}</div></details>
+      </div>
+      <div class="card"><h2>${esc(t("focusTitle"))}</h2><p class="insight">${focusTip()}</p>
+        <h2 style="margin-top:14px">${esc(t("openingTitle"))}</h2><p class="insight">${openingTip()}</p>
+        <h2 style="margin-top:14px">${esc(t("logTitle"))}</h2>
+        <div class="row">
+          <label class="field">${esc(t("myPick"))}<select id="logPick"><option value="">${esc(t("empty"))}</option>${CANDS.map(c => `<option value="${c.id}" ${COMP.pick === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
+          <label class="field">${esc(t("mapCol"))}<select id="logMap"><option value="">${esc(t("empty"))}</option>${mapsList.map(mp => `<option ${COMP.map === mp ? "selected" : ""}>${esc(mp)}</option>`).join("")}</select></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="win" id="logW">${esc(t("weWon"))}</button><button class="loss" id="logL">${esc(t("weLost"))}</button>
+          ${D.me && (D.me.games || []).length ? `<button id="logFill">${esc(t("fillFromLast"))}</button>` : ""}
+          <span class="m" id="logMsg" role="status"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card section"><h2>${esc(t("logStats"))}</h2>${logStatsHtml(log)}
+      <div class="row" style="margin-top:10px"><button id="logExport">${esc(t("exportLog"))}</button>
+        <label class="row" style="gap:6px"><button id="logImportBtn" type="button">${esc(t("importLog"))}</button><input type="file" id="logImport" accept="application/json" class="sr"></label></div>
+      <div class="note">${esc(t("logNote"))}</div></div>`;
+  sec.querySelectorAll("select[data-team]").forEach(sel => sel.addEventListener("change", () => {
+    const x = COMP[sel.dataset.team][+sel.dataset.i];
+    if (sel.dataset.f === "s") { x.s = sel.value; x.r = ""; } else x.r = sel.value;
+    store.set("comp", COMP); renderHelper();
+  }));
+  sec.querySelectorAll("input[data-cand]").forEach(cb => cb.addEventListener("change", () => {
+    const on = [...sec.querySelectorAll("input[data-cand]:checked")].map(x => x.dataset.cand);
+    store.set("cands", on.length ? on : CANDS.map(c => c.id)); renderHelper();
+  }));
+  $("clearComp").addEventListener("click", () => { COMP = emptyComp(); store.set("comp", COMP); renderHelper(); });
+  $("logPick").addEventListener("change", e => { COMP.pick = e.target.value; store.set("comp", COMP); });
+  $("logMap").addEventListener("change", e => { COMP.map = e.target.value; store.set("comp", COMP); });
+  const saveLog = res2 => {
+    if (!COMP.pick) { $("logMsg").textContent = t("needPick"); return; }
+    const L = store.get("log", []);
+    L.push({ts: Math.round(Date.now() / 1000), map: COMP.map, pick: COMP.pick, res: res2,
+      ally: COMP.ally.filter(x => x.s).map(x => x.s), enemy: COMP.enemy.filter(x => x.s).map(x => x.s)});
+    store.set("log", L); COMP = {...emptyComp(), pick: COMP.pick}; store.set("comp", COMP); renderHelper(); $("logMsg").textContent = t("logged");
+  };
+  $("logW").addEventListener("click", () => saveLog("W"));
+  $("logL").addEventListener("click", () => saveLog("L"));
+  if ($("logFill")) $("logFill").addEventListener("click", () => {
+    const g = D.me.games[D.me.games.length - 1];
+    const nm = mapName(g.map_id); if (mapsList.includes(nm)) COMP.map = nm;
+    store.set("comp", COMP); renderHelper(); saveLog(isWin(g) ? "W" : "L");
+  });
+  $("logExport").addEventListener("click", () => {
+    const blob = new Blob([JSON.stringify(store.get("log", []), null, 1)], {type: "application/json"});
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "gw2_match_log.json"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  });
+  $("logImportBtn").addEventListener("click", () => $("logImport").click());
+  $("logImport").addEventListener("change", async e => {
+    try { const arr = JSON.parse(await e.target.files[0].text());
+      if (Array.isArray(arr)) { const L = store.get("log", []); const seen = new Set(L.map(x => x.ts + x.pick));
+        arr.forEach(x => { if (x && x.ts && !seen.has(x.ts + x.pick)) L.push(x); }); store.set("log", L); renderHelper(); } } catch (err) {}
+  });
+}
+function logStatsHtml(log) {
+  if (!log.length) return `<div class="empty">${esc(t("noLog"))}</div>`;
+  const byPick = {}, vs = {};
+  log.forEach(x => { const p = byPick[x.pick] || (byPick[x.pick] = {n: 0, w: 0}); p.n++; if (x.res === "W") p.w++;
+    new Set(x.enemy).forEach(s => { const v = vs[s] || (vs[s] = {n: 0, w: 0}); v.n++; if (x.res === "W") v.w++; }); });
+  const cname = id => (CANDS.find(c => c.id === id) || {name: id}).name;
+  const tbl = (head, rows) => `<table><thead><tr><th>${esc(head)}</th><th class="num">${esc(t("gamesCol"))}</th><th class="num">${esc(t("wl"))}</th><th class="num">${esc(t("winRate"))}</th></tr></thead><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${v.n}</td><td class="num">${v.w}-${v.n - v.w}</td><td class="num">${pct(v.w, v.n)}</td></tr>`).join("")}</tbody></table>`;
+  return `<div class="grid2"><div><h3>${esc(t("byPick"))}</h3>${tbl(t("pickCol"), Object.entries(byPick).map(([k, v]) => [cname(k), v]).sort((a, b) => b[1].n - a[1].n))}</div>
+    <div><h3>${esc(t("vsEnemy"))}</h3><div class="tscroll" style="max-height:300px">${tbl(t("specCol"), Object.entries(vs).sort((a, b) => b[1].n - a[1].n).slice(0, 12))}</div></div></div>`;
+}
+
+// ============================================================== LEARN (2, 3, 5, 4)
+function renderLearn() {
+  const L = LI();
+  $("tab-learn").innerHTML = `
+    <div class="grid2">
+      <div class="card"><h2>${esc(t("learnGloss"))}</h2><dl class="gloss">${GLOSSARY.map(g => `<dt>${esc(g[0])}</dt><dd>${esc(g[L + 1])}</dd>`).join("")}</dl></div>
+      <div class="card"><h2>${esc(t("learnRot"))}</h2><ol class="steps">${ROTATION.map(r => `<li>${esc(r[L])}</li>`).join("")}</ol></div>
+    </div>
+    <div class="card section"><h2>${esc(t("learnMaps"))}</h2>
+      ${MAPS.map(mp => `<details><summary>${esc(mp.name)}</summary><p><b>${esc(t("secondary"))}:</b> ${esc(mp.sec[L])}</p><p><b>${esc(t("tip"))}:</b> ${esc(mp.tip[L])}</p></details>`).join("")}
+      <div class="note"><a href="https://wiki.guildwars2.com/wiki/Conquest" target="_blank" rel="noopener">${esc(t("source"))}: GW2 Wiki</a></div>
+    </div>
+    <div class="card section"><h2>${esc(t("learnBuilds"))}</h2>
+      <div class="tscroll"><table><thead><tr><th>Build</th><th>${esc(t("klass"))}</th><th>${esc(t("roleCol2"))}</th><th>${esc(t("diffCol"))}</th><th></th></tr></thead><tbody>
+      ${BUILDS.map((b, i) => `<tr><td><a href="${b.url}" target="_blank" rel="noopener">${esc(b.name)}</a></td><td>${esc(b.cls)}</td><td>${esc(b.role[L])}</td><td>${esc(t(b.diff))}</td>
+        <td><div class="row" style="flex-wrap:nowrap"><button data-copy="${i}">${esc(t("copy"))}</button><button data-dec="${i}">${esc(t("decode"))}</button></div></td></tr>`).join("")}
+      </tbody></table></div><div class="note">${esc(t("buildsNote"))}</div>
+    </div>
+    <div class="card section"><h2>${esc(t("learnDecoder"))}</h2><p class="insight">${t("decoderIntro")}</p>
+      <textarea id="decIn" spellcheck="false" placeholder="[&DQ...]"></textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" id="decBtn">${esc(t("decode"))}</button></div>
+      <div id="decOut" class="section" role="status"></div>
+    </div>`;
+  document.querySelectorAll("[data-copy]").forEach(bt => bt.addEventListener("click", async () => {
+    const code = BUILDS[+bt.dataset.copy].code;
+    try { await navigator.clipboard.writeText(code); } catch (e) { const ta = document.createElement("textarea"); ta.value = code; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); } catch (e2) {} ta.remove(); }
+    bt.textContent = t("copied"); setTimeout(() => bt.textContent = t("copy"), 1500);
+  }));
+  document.querySelectorAll("[data-dec]").forEach(bt => bt.addEventListener("click", () => { $("decIn").value = BUILDS[+bt.dataset.dec].code; runDecoder(); $("decIn").scrollIntoView({block: "center"}); }));
+  $("decBtn").addEventListener("click", runDecoder);
+}
+const PROFS = ["", "Guardian", "Warrior", "Engineer", "Ranger", "Thief", "Elementalist", "Mesmer", "Necromancer", "Revenant"];
+function decodeBuild(txt) {
+  const mm = String(txt).match(/\[&([A-Za-z0-9+/=]+)\]/) || String(txt).trim().match(/^([A-Za-z0-9+/=]{20,})$/);
+  if (!mm) return null;
+  let bin; try { bin = atob(mm[1]); } catch (e) { return null; }
+  const b = Uint8Array.from(bin, c => c.charCodeAt(0));
+  if (b.length < 44 || b[0] !== 0x0D || !PROFS[b[1]]) return null;
+  const u16 = i => b[i] | (b[i + 1] << 8);
+  const specs = [0, 1, 2].map(i => { const tb = b[3 + 2 * i]; return {id: b[2 + 2 * i], choices: [tb & 3, (tb >> 2) & 3, (tb >> 4) & 3]}; });
+  const pal = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => u16(8 + 2 * i));
+  const out = {prof: PROFS[b[1]], specs, palette: [pal[0], pal[2], pal[4], pal[6], pal[8]], legends: [], pets: [], weapons: 0};
+  if (b[1] === 9) out.legends = [b[28], b[29]].filter(Boolean);
+  if (b[1] === 4) out.pets = [b[28], b[29]].filter(Boolean);
+  if (b.length > 44) out.weapons = b[44];
+  return out;
+}
+async function apiGet(path) {
+  const r = await fetch("https://api.guildwars2.com/v2/" + path);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+async function runDecoder() {
+  const out = $("decOut"), dec = decodeBuild($("decIn").value);
+  if (!dec) { out.innerHTML = `<p class="insight">${esc(t("decInvalid"))}</p>`; return; }
+  const lang = LANG === "es" ? "es" : "en";
+  const render = (names, offline) => {
+    const specName = s => names.spec[s.id] ? names.spec[s.id].name : `#${s.id}`;
+    const traitTxt = s => s.choices.map((c, tier) => { if (!c) return "-"; const id = names.spec[s.id] && names.spec[s.id].major_traits[tier * 3 + c - 1];
+      return id && names.trait[id] ? names.trait[id] : ["top", "mid", "bot"][c - 1]; }).join(" · ");
+    out.innerHTML = (offline ? `<p class="note">${esc(t("decOffline"))}</p>` : "") +
+      `<p class="insight"><b>${esc(t("decProf"))}:</b> ${esc(dec.prof)}</p>
+       <h3>${esc(t("decSpecs"))}</h3><ul class="list">${dec.specs.map(s => `<li><span class="n"><b>${esc(specName(s))}</b></span><span class="m" style="white-space:normal;text-align:right">${esc(traitTxt(s))}</span></li>`).join("")}</ul>
+       <h3 style="margin-top:10px">${esc(t("decSkills"))}</h3><p class="insight">${dec.palette.map(p => { const sid = names.pal[p]; return esc(sid && names.skill[sid] ? names.skill[sid] : (p ? `#${p}` : "-")); }).join(" · ")}</p>` +
+      (dec.legends.length ? `<h3>${esc(t("decLegends"))}</h3><p class="insight">${dec.legends.map(l => esc(names.legend[l] || `#${l}`)).join(" · ")}</p>` : "") +
+      (dec.pets.length ? `<h3>${esc(t("decPets"))}</h3><p class="insight">${dec.pets.map(p => esc(names.pet[p] || `#${p}`)).join(" · ")}</p>` : "") +
+      (dec.weapons ? `<p class="note">${esc(t("decWeapons", {n: dec.weapons}))}</p>` : "");
+  };
+  const names = {spec: {}, trait: {}, skill: {}, pal: {}, legend: {}, pet: {}};
+  render(names, false); out.insertAdjacentHTML("afterbegin", `<p class="note">${esc(t("decLoading"))}</p>`);
+  try {
+    const V = "v=2019-12-19T00:00:00.000Z";
+    const [prof, specs] = await Promise.all([apiGet(`professions/${dec.prof}?${V}&lang=${lang}`), apiGet(`specializations?ids=${dec.specs.map(s => s.id).join(",")}&lang=${lang}`)]);
+    (prof.skills_by_palette || []).forEach(([p, s]) => names.pal[p] = s);
+    specs.forEach(s => names.spec[s.id] = s);
+    const traitIds = []; dec.specs.forEach(s => s.choices.forEach((c, tier) => { const id = c && names.spec[s.id] && names.spec[s.id].major_traits[tier * 3 + c - 1]; if (id) traitIds.push(id); }));
+    let legendSwap = {};
+    if (dec.legends.length) { const L = await apiGet(`legends?ids=all&${V}`); L.forEach(l => { if (l.code) legendSwap[l.code] = l.swap; }); }
+    const skillIds = [...dec.palette.map(p => names.pal[p]).filter(Boolean), ...dec.legends.map(l => legendSwap[l]).filter(Boolean)];
+    const [traits, skills, pets] = await Promise.all([
+      traitIds.length ? apiGet(`traits?ids=${traitIds.join(",")}&lang=${lang}`) : [],
+      skillIds.length ? apiGet(`skills?ids=${[...new Set(skillIds)].join(",")}&lang=${lang}`) : [],
+      dec.pets.length ? apiGet(`pets?ids=${dec.pets.join(",")}&lang=${lang}`) : []]);
+    traits.forEach(x => names.trait[x.id] = x.name); skills.forEach(x => names.skill[x.id] = x.name); pets.forEach(x => names.pet[x.id] = x.name);
+    dec.legends.forEach(l => { const sid = legendSwap[l]; if (sid && names.skill[sid]) names.legend[l] = names.skill[sid]; });
+    render(names, false);
+  } catch (e) { render(names, true); }
+}
+
+// ============================================================== ARCHIVE + EXPORTS (14, 16)
+function renderArchive() {
+  const A = D.archive || [];
+  const dFmt = s => s ? new Date(s * 1000).toLocaleDateString(LOC(), {day: "numeric", month: "short", year: "numeric"}) : "";
+  $("tab-archive").innerHTML = `
+    <div class="card"><h2>${esc(t("archiveTitle"))}</h2><p class="insight">${esc(t("archiveIntro"))}</p>
+      ${A.length ? A.map(a => `<details ${a.season_id === D.seasonId && a.region === D.region ? "open" : ""}><summary>${esc(a.season)} · ${esc(a.region)}${a.season_id === D.seasonId && a.region === D.region ? ` <span class="tag">${esc(t("current"))}</span>` : ""}
+          <span class="m"> · ${esc(t("saved", {t: dFmt(a.saved_at)}))} · ${esc(t("cutoff250"))}: ${a.cutoff ?? "-"}</span></summary>
+          <table style="margin-top:6px"><thead><tr><th class="num">#</th><th>${esc(t("player"))}</th><th class="num">${esc(t("rating"))}</th><th class="num">${esc(t("wl"))}</th></tr></thead><tbody>
+          ${a.top.map(p => `<tr><td class="num">${p[0]}</td><td>${esc(p[1])}</td><td class="num">${p[2]}</td><td class="num">${p[3]}-${p[4]}</td></tr>`).join("")}</tbody></table>
+          <div class="note"><code>${esc(a.file)}</code></div></details>`).join("") : `<div class="empty">${esc(t("archiveNone"))}</div>`}
+    </div>
+    <div class="card section"><h2>${esc(t("exportsTitle"))}</h2><p class="insight">${esc(t("exportsIntro"))} <code>${esc(D.files.exports)}</code></p>
+      <ul class="list">
+        <li><span class="n"><code>top250_${esc(D.region.toLowerCase())}.csv</code></span><span class="m" style="white-space:normal">${esc(t("exTop"))}</span></li>
+        <li><span class="n"><code>rating_cutoffs_${esc(D.region.toLowerCase())}.csv</code></span><span class="m" style="white-space:normal">${esc(t("exCut"))}</span></li>
+        <li><span class="n"><code>my_games.csv</code></span><span class="m" style="white-space:normal">${esc(t("exMine"))}</span></li>
+        <li><span class="n"><code>friends.csv</code></span><span class="m" style="white-space:normal">${esc(t("exFriends"))}</span></li>
+      </ul><div class="note">${esc(t("exNote"))}</div></div>`;
+}
+
+// ============================================================== profile drawer
+function showProfile(n) {
+  const row = ROW.get(n), pr = PROF[n] || {h: [], r: []}, st = pstats(n);
+  const res = [...(pr.r || [])].reverse().slice(0, 15), tot = row ? row[3] + row[4] : 0;
+  $("drawer").innerHTML = `
+    <button class="close" id="closeBtn">${esc(t("close"))}</button>
+    <h2 style="margin:4px 0 2px;padding-right:80px;word-break:break-word">${esc(n)}</h2>
+    <div class="sub">${row ? esc(t("rankNo", {n: row[0]})) : esc(t("notInTop"))}${row && row[5] ? ` · ${esc(t("lastMatchAgo", {t: ago(row[5])}))}` : ""}</div>
+    <div class="tiles">
+      ${tile(t("rating"), row ? row[2] : "-", row ? t("thisSeason", {w: row[3], l: row[4]}) : "")}
+      ${tile(t("winRate"), row ? pct(row[3], tot) : "-", t("games", {n: tot}))}
+      ${tile(t("streak"), st.streak ? `${st.streak}${st.kind}` : "-", st.streak ? t(st.kind === "W" ? "winsRow" : "lossesRow") : t("noStreak"))}
+      ${tile(t("last24"), signed(st.net), t("gamesSeen", {n: st.games}))}
+    </div>
+    <h3>${esc(t("rating"))}</h3><div class="chartbox" id="pchart"></div>
+    <h3 style="margin-top:14px">${esc(t("recentResults"))}</h3>
+    ${res.length ? `<div class="pills">${res.map(x => { const w = x[1] && !x[2], l = x[2] && !x[1];
+      return `<span class="pill ${w ? "w" : l ? "l" : ""}" title="${esc(new Date(x[0] * 1000).toLocaleString(LOC()))}">${w ? "W" : l ? "L" : "W/L"} ${signed(x[4])}</span>`; }).join("")}</div>`
+      : `<div class="empty">${esc(t("noMatchesSeen"))}</div>`}
+    <div class="note">${esc(t("onlySeen"))}</div>`;
+  $("drawer").classList.add("open"); $("shade").classList.add("open");
+  lineChart($("pchart"), [{name: n, points: pr.h || []}], {height: 200, empty: t("noHistory")});
+  $("closeBtn").addEventListener("click", closeProfile);
+}
+function closeProfile() {
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
+  $("drawer").classList.remove("open"); $("shade").classList.remove("open");
+}
+function fromHash() {
+  const mt = location.hash.match(/^#p=(.+)$/);
+  if (mt) showProfile(decodeURIComponent(mt[1])); else { $("drawer").classList.remove("open"); $("shade").classList.remove("open"); }
+}
+$("shade").addEventListener("click", closeProfile);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("drawer").classList.contains("open")) closeProfile(); });
+window.addEventListener("hashchange", fromHash);
+
+// ============================================================== boot
+function drawVisible() {
+  if (TAB === "overview") { drawTop(); drawCutoffs(); drawHeat(); }
+  if (TAB === "me") drawMe();
+  if (TAB === "friends") drawFriends();
+}
+function renderAll() {
+  renderHeader(); renderTabs(); renderTilt(); renderOverview(); renderMe(); renderFriends(); renderHelper(); renderLearn(); renderArchive();
+  drawVisible(); fromHash();
+}
+$("lang").addEventListener("change", e => { LANG = e.target.value; store.set("lang", LANG); renderAll(); });
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { drawVisible(); fromHash(); }, 150); });
+try { const sy = sessionStorage.getItem("gw2lw-y"); if (sy) window.scrollTo(0, +sy); } catch (e) {}
+window.addEventListener("beforeunload", () => { try { sessionStorage.setItem("gw2lw-y", String(window.scrollY)); } catch (e) {} });
+
+// ============================================================== WEB ENGINE
+const API = "https://api.guildwars2.com/v2";
+const INTERVAL = 120, MAX_HISTORY = 150, MAX_RESULTS = 60, MAX_EVENTS = 200, PROFILE_POINTS = 120, HEAT_DAYS = 28;
+const CUT_RANKS = [1, 10, 50, 100, 250];
+const GAME_FIELDS = ["map_id", "started", "ended", "result", "team", "profession", "scores", "rating_type", "rating_change", "season"];
+let REGION = store.get("region", "na"); if (!["na", "eu"].includes(REGION)) REGION = "na";
+let SEASON = null, ST = null, BUSY = false, ERR = "", SEED_TS = null, SEED_TRIED = false, RESET_ARMED = false;
+let ME = store.get("meStore", null) || {};
+let FR = store.get("frStore", null) || {};
+let MAPNAMES = store.get("maps", null) || {};
+const KEY = () => store.get("key", "");
+const FRIEND_KEYS = () => store.get("friendKeys", []);
+class AuthErr extends Error {}
+
+async function api(path, key) {
+  let url = API + path;
+  if (key) url += (path.includes("?") ? "&" : "?") + "access_token=" + encodeURIComponent(key);
+  const r = await fetch(url);
+  if (key && (r.status === 401 || r.status === 403)) throw new AuthErr("key");
+  if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+  return r.json();
+}
+async function findSeason() {
+  const all = await api("/pvp/seasons?ids=all");
+  const act = (all || []).filter(s => s.active && s.leaderboards && s.leaderboards.ladder);
+  if (!act.length) return null;
+  const s = act[act.length - 1], ids = {};
+  (s.leaderboards.ladder.scorings || []).forEach(sc => { if (sc && sc.name) ids[sc.name.toLowerCase()] = sc.id; });
+  return {id: s.id, name: s.name, start: s.start, end: s.end, rating: ids.rating, wins: ids.wins, losses: ids.losses};
+}
+async function fetchLadder(season) {
+  const players = {};
+  for (let page = 0; page < 5; page++) {
+    let data;
+    try { data = await api(`/pvp/seasons/${season.id}/leaderboards/ladder/${REGION}?page=${page}&page_size=200`); }
+    catch (e) { if (e.status === 400 || e.status === 404) break; throw e; }
+    if (!data || !data.length) break;
+    data.forEach(en => { const sc = {}; (en.scores || []).forEach(x => sc[x.id] = x.value);
+      players[en.name] = {rank: en.rank, rating: sc[season.rating] || 0, wins: sc[season.wins] || 0, losses: sc[season.losses] || 0}; });
+    if (data.length < 200) break;
+  }
+  return players;
+}
+
+// ---- leaderboard state (same logic as the PC program)
+function newState(seasonId) {
+  return {season: seasonId, region: REGION, players: {}, history: {}, results: {}, events: [], activity: {},
+          hour_counts: {}, observed_hours: {}, cutoffs: [], updated: 0};
+}
+const stateKey = () => "gw2lw-state-" + REGION;
+function loadState() {
+  try { const s = JSON.parse(localStorage.getItem(stateKey()) || "null"); if (s && s.players) return Object.assign(newState(s.season), s); } catch (e) {}
+  return null;
+}
+function saveState() {
+  const put = () => localStorage.setItem(stateKey(), JSON.stringify(ST));
+  try { put(); return; } catch (e) {}
+  try {   // over the browser quota: keep less history
+    Object.keys(ST.history).forEach(n => ST.history[n] = ST.history[n].slice(-60));
+    ST.events = ST.events.slice(-80); ST.cutoffs = ST.cutoffs.slice(-500);
+    put();
+  } catch (e) {}
+}
+function diffSnapshots(old, neu) {
+  const ev = [], hadOld = Object.keys(old).length > 0;
+  for (const [n, now] of Object.entries(neu)) {
+    const b = old[n];
+    if (!b) { if (hadOld) ev.push({name: n, type: "new", now, before: null, dw: 0, dl: 0}); continue; }
+    const dw = now.wins - b.wins, dl = now.losses - b.losses;
+    if (dw || dl) ev.push({name: n, type: "match", now, before: b, dw, dl});
+  }
+  for (const n of Object.keys(old)) if (!neu[n]) ev.push({name: n, type: "left", now: null, before: old[n], dw: 0, dl: 0});
+  ev.sort((a, b) => ((a.now || a.before).rank || 999) - ((b.now || b.before).rank || 999));
+  return ev;
+}
+function applySnapshot(st, neu, ts, watched) {
+  const old = st.players, ev = diffSnapshots(old, neu);
+  if (!Object.keys(old).length) {
+    for (const [n, d] of Object.entries(neu)) (st.history[n] = st.history[n] || []).push([ts, d.rating]);
+  } else {
+    const bucket = String(Math.floor(ts / 3600) * 3600);
+    if (watched > 0) st.observed_hours[bucket] = Math.min(3600, (st.observed_hours[bucket] || 0) + watched);
+    for (const e of ev) {
+      if (e.type === "match" || e.type === "new") {
+        const h = st.history[e.name] = st.history[e.name] || [];
+        h.push([ts, e.now.rating]); if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
+      }
+      if (e.type === "match") {
+        st.activity[e.name] = ts;
+        const r = st.results[e.name] = st.results[e.name] || [];
+        r.push([ts, e.dw, e.dl, e.now.rating, e.now.rating - e.before.rating]);
+        if (r.length > MAX_RESULTS) r.splice(0, r.length - MAX_RESULTS);
+        st.hour_counts[bucket] = (st.hour_counts[bucket] || 0) + e.dw + e.dl;
+      }
+      const now = e.now || {}, before = e.before || {};
+      st.events.push({ts, name: e.name, type: e.type, dw: e.dw, dl: e.dl, rank: now.rank ?? null, rank_before: before.rank ?? null,
+                      rating: now.rating ?? null, rating_before: before.rating ?? null});
+    }
+    if (st.events.length > MAX_EVENTS) st.events.splice(0, st.events.length - MAX_EVENTS);
+    const cut = ts - HEAT_DAYS * 86400;
+    for (const k of ["hour_counts", "observed_hours"]) for (const b of Object.keys(st[k])) if (+b < cut) delete st[k][b];
+  }
+  const byRank = Object.values(neu).map(d => d.rating).sort((a, b) => b - a);
+  const point = [ts, ...CUT_RANKS.map(r => byRank.length >= r ? byRank[r - 1] : null)];
+  const last = st.cutoffs[st.cutoffs.length - 1];
+  if (!last || JSON.stringify(last.slice(1)) !== JSON.stringify(point.slice(1)) || ts - last[0] >= 1800) {
+    st.cutoffs.push(point); if (st.cutoffs.length > 4000) st.cutoffs.splice(0, st.cutoffs.length - 4000);
+  }
+  st.players = neu;
+}
+// Shared history: on GitHub Pages it lives in the repo's "data" branch; elsewhere next to index.html.
+const DATA_BASE = (() => {
+  const m = location.hostname.match(/^([^.]+)\.github\.io$/i);
+  if (!m) return "";
+  const repo = location.pathname.split("/").filter(Boolean)[0] || `${m[1]}.github.io`;
+  return `https://raw.githubusercontent.com/${m[1]}/${repo}/data/`;
+})();
+async function loadSeed() {
+  SEED_TRIED = true;
+  try {
+    const r = await fetch(`${DATA_BASE}public_snapshot_${REGION}.json?t=${Math.floor(Date.now() / 60000)}`, {cache: "no-store"});
+    if (!r.ok) return;
+    const seed = await r.json();
+    if (!seed || seed.season !== SEASON.id || seed.region !== REGION || !seed.players) return;
+    SEED_TS = seed.updated;
+    if (!ST || !ST.updated || seed.updated > ST.updated) {
+      ST = Object.assign(newState(SEASON.id), {players: seed.players, history: seed.history || {}, results: seed.results || {},
+        events: seed.events || [], activity: seed.activity || {}, hour_counts: seed.hour_counts || {},
+        observed_hours: seed.observed_hours || {}, cutoffs: seed.cutoffs || [], updated: seed.updated, fromSeed: true});
+    }
+  } catch (e) {}
+}
+
+// ---- you + friends (API keys stay in this browser)
+async function fetchPlayer(st, key, seasonId) {
+  st.games = st.games || {}; st.ratings = st.ratings || [];
+  if (!st.account) st.account = (await api("/account", key)).name;
+  for (const g of (await api("/pvp/games?ids=all", key)) || []) {
+    if (g && g.id && !st.games[g.id]) { const o = {}; GAME_FIELDS.forEach(k => o[k] = g[k] ?? null); st.games[g.id] = o; }
+  }
+  const ids = Object.keys(st.games);
+  if (ids.length > 1500) {
+    ids.sort((a, b) => String(st.games[a].ended).localeCompare(String(st.games[b].ended)));
+    ids.slice(0, ids.length - 1500).forEach(id => delete st.games[id]);
+  }
+  let sd = await api("/pvp/standings", key); if (!Array.isArray(sd)) sd = [sd];
+  const cur = sd.find(s => s && s.season_id === seasonId), rating = cur && cur.current ? cur.current.rating : null;
+  if (rating != null) {
+    if (!st.ratings.length || st.ratings[st.ratings.length - 1][1] !== rating) st.ratings.push([Date.now() / 1000, rating]);
+    if (st.ratings.length > 1500) st.ratings.splice(0, st.ratings.length - 1500);
+    st.rating = rating;
+  }
+  const missing = [...new Set(Object.values(st.games).map(g => g.map_id).filter(x => x != null).map(String))].filter(x => !MAPNAMES[x]);
+  if (missing.length) { try { (await api("/maps?ids=" + missing.join(","))).forEach(m => MAPNAMES[String(m.id)] = m.name || "Map " + m.id); } catch (e) {} }
+}
+function person(st) {
+  if (!st || !st.account || !st.games) return null;
+  return {account: st.account, rating: st.rating ?? null, ratings: (st.ratings || []).slice(-500), error: st.error || null,
+          games: Object.values(st.games).sort((a, b) => String(a.ended).localeCompare(String(b.ended)))};
+}
+
+// ---- data for the dashboard (same shape the PC program writes)
+function buildD() {
+  const st = ST || newState("");
+  const players = Object.entries(st.players).sort((a, b) => (a[1].rank || 999) - (b[1].rank || 999));
+  const profiles = {};
+  players.forEach(([n]) => profiles[n] = {h: (st.history[n] || []).slice(-PROFILE_POINTS), r: (st.results[n] || []).slice(-30)});
+  return {
+    season: (SEASON && SEASON.name) || st.seasonName || "GW2 PvP", seasonId: SEASON ? SEASON.id : st.season,
+    seasonStart: SEASON ? SEASON.start : st.seasonStart || null, seasonEnd: SEASON ? SEASON.end : st.seasonEnd || null,
+    region: REGION.toUpperCase(), updated: st.updated || Date.now() / 1000, interval: INTERVAL, activeWindow: 20, watch: [],
+    players: players.map(([n, d]) => [d.rank, n, d.rating, d.wins, d.losses, st.activity[n] ?? null]),
+    series: players.slice(0, 5).map(([n]) => ({name: n, points: st.history[n] || []})),
+    profiles, events: st.events.slice(-60).reverse(), heat: {counts: st.hour_counts, observed: st.observed_hours},
+    cutoffs: st.cutoffs.slice(-1500), cutoffRanks: CUT_RANKS, maps: MAPNAMES, hasKey: !!KEY(),
+    me: KEY() ? person(ME) : null, friends: FRIEND_KEYS().map(f => person(FR[f.account])).filter(Boolean),
+    archive: [], files: {exports: "", archive: ""}
+  };
+}
+
+// ---- update loop
+async function tick() {
+  if (BUSY) return; BUSY = true;
+  try {
+    if (!SEASON) { SEASON = await findSeason(); if (!SEASON) { ERR = t("noSeason"); return; } }
+    if (!ST || ST.season !== SEASON.id || ST.region !== REGION) { const s = loadState(); ST = s && s.season === SEASON.id ? s : newState(SEASON.id); }
+    await loadSeed();
+    Object.assign(ST, {seasonName: SEASON.name, seasonStart: SEASON.start, seasonEnd: SEASON.end});
+    const neu = await fetchLadder(SEASON), now = Date.now() / 1000;
+    if (Object.keys(neu).length) {
+      const gap = ST.updated ? Math.max(0, now - ST.updated) : 0;
+      applySnapshot(ST, neu, now, Math.min(gap, INTERVAL));
+      ST.updated = now; saveState();
+    }
+    ERR = "";
+    const key = KEY();
+    if (key) {
+      try { await fetchPlayer(ME, key, SEASON.id); delete ME.error; }
+      catch (e) { if (e instanceof AuthErr) ME.error = "key"; }
+      store.set("meStore", ME);
+    }
+    for (const f of FRIEND_KEYS()) {
+      const s = FR[f.account] = FR[f.account] || {account: f.account};
+      try { await fetchPlayer(s, f.key, SEASON.id); delete s.error; } catch (e) { if (e instanceof AuthErr) s.error = "key"; }
+    }
+    store.set("frStore", FR); store.set("maps", MAPNAMES);
+  } catch (e) { ERR = t("apiErr"); }
+  finally { BUSY = false; D = buildD(); refresh(); }
+}
+function tickSoon() { if (BUSY) setTimeout(tickSoon, 500); else tick(); }
+function refresh() {
+  rebind();
+  const typing = id => { const a = document.activeElement; return !!(a && $(id) && $(id).contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName)); };
+  renderHeader(); renderTabs(); renderTilt(); renderOverview();
+  if (!typing("tab-me")) renderMe();
+  if (!typing("tab-friends")) renderFriends();
+  if (!typing("tab-archive")) renderArchive();
+  drawVisible();
+  if ($("drawer").classList.contains("open")) fromHash();
+}
+
+// ---- web-only parts of the page
+const _renderHeader = renderHeader;
+renderHeader = function () {
+  _renderHeader();
+  $("region").value = REGION;
+  const extra = ERR ? ERR : (!D.players.length ? t("loading") : "");
+  if (extra) $("meta").insertAdjacentHTML("beforeend", ` · <span class="stale">${esc(extra)}</span>`);
+};
+function keyForm(id, ph, label) {
+  return `<form class="keyform" id="${id}Form" autocomplete="off"><input type="password" id="${id}In" placeholder="${esc(t(ph))}" aria-label="${esc(t(ph))}" spellcheck="false" autocomplete="off"><button class="primary" type="submit">${esc(t(label))}</button></form><div class="msg" id="${id}Msg" role="status"></div>`;
+}
+async function checkKey(k) {
+  const acc = (await api("/account", k)).name;
+  await api("/pvp/standings", k);
+  return acc;
+}
+const _renderMe = renderMe;
+renderMe = function () {
+  const err = ME && ME.error === "key";
+  if (!D.me) {
+    const waiting = D.hasKey && !err;
+    $("tab-me").innerHTML = `<div class="card"><h2>${esc(t("meTitle"))}</h2><p class="insight">${waiting ? t("meKeySaved") : t("meNeedKey")}</p>
+      ${waiting ? `<div class="btnrow"><button class="small" id="forgetKey">${esc(t("keyRemove"))}</button></div>` :
+        `<ol class="steps"><li>${t("keyStep1")}</li><li>${t("keyStep2")}</li><li>${t("keyStep3")}</li></ol>${keyForm("key", "keyPh", "keySave")}`}</div>`;
+    if (err && $("keyMsg")) { $("keyMsg").textContent = t("keyBad"); $("keyMsg").className = "msg bad"; }
+  } else {
+    _renderMe();
+    $("tab-me").insertAdjacentHTML("beforeend", `<div class="note section">${esc(t("keyHere"))} <button class="small" id="forgetKey">${esc(t("keyRemove"))}</button></div>`);
+  }
+  if ($("forgetKey")) $("forgetKey").addEventListener("click", () => {
+    store.set("key", ""); ME = {}; store.set("meStore", ME); D = buildD(); refresh();
+  });
+  if ($("keyForm")) $("keyForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const k = $("keyIn").value.trim(), msg = $("keyMsg");
+    if (!k) return;
+    msg.className = "msg"; msg.textContent = t("keyChecking");
+    try {
+      const acc = await checkKey(k);
+      store.set("key", k); ME = {account: acc}; store.set("meStore", ME);
+      $("keyIn").value = ""; $("keyIn").blur(); D = buildD(); refresh(); tickSoon();
+    } catch (er) { msg.className = "msg bad"; msg.textContent = er instanceof AuthErr ? t("keyBad") : t("keyNet"); }
+  });
+};
+const _renderFriends = renderFriends;
+renderFriends = function () {
+  _renderFriends();
+  const card = $("tab-friends").querySelector(".card");
+  const list = FRIEND_KEYS();
+  card.insertAdjacentHTML("beforeend", keyForm("fr", "friendPh", "addFriend") +
+    (list.length ? `<ul class="list">${list.map(f => `<li><span class="n">${esc(f.account)}</span><button class="small" data-rmfr="${esc(f.account)}">${esc(t("remove"))}</button></li>`).join("")}</ul>` : ""));
+  card.querySelectorAll("[data-rmfr]").forEach(b => b.addEventListener("click", () => {
+    store.set("friendKeys", FRIEND_KEYS().filter(f => f.account !== b.dataset.rmfr));
+    delete FR[b.dataset.rmfr]; store.set("frStore", FR); D = buildD(); refresh();
+  }));
+  $("frForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const k = $("frIn").value.trim(), msg = $("frMsg");
+    if (!k) return;
+    if (k === KEY()) { msg.className = "msg bad"; msg.textContent = t("friendSelf"); return; }
+    msg.className = "msg"; msg.textContent = t("keyChecking");
+    try {
+      const acc = await checkKey(k);
+      const cur = FRIEND_KEYS();
+      if (cur.some(f => f.account === acc)) { msg.className = "msg bad"; msg.textContent = t("friendDup", {n: acc}); return; }
+      cur.push({account: acc, key: k}); store.set("friendKeys", cur);
+      FR[acc] = {account: acc}; $("frIn").value = ""; $("frIn").blur();
+      D = buildD(); refresh(); $("frMsg").className = "msg good"; $("frMsg").textContent = t("friendAdded", {n: acc}); tickSoon();
+    } catch (er) { msg.className = "msg bad"; msg.textContent = er instanceof AuthErr ? t("keyBad") : t("keyNet"); }
+  });
+};
+function csv(rows) { return "﻿" + rows.map(r => r.map(v => { const s = v == null ? "" : String(v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }).join(";")).join("\r\n"); }
+function download(name, text) {
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], {type: "text/csv;charset=utf-8"}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+const stamp = ts => { const d = new Date(ts * 1000), p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
+renderArchive = function () {
+  const st = ST || newState("");
+  const first = Math.min(...Object.values(st.history).map(h => h.length ? h[0][0] : Infinity), Infinity);
+  let bytes = 0; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("gw2lw-")) bytes += (localStorage.getItem(k) || "").length; } } catch (e) {}
+  const reg = REGION.toLowerCase();
+  $("tab-archive").innerHTML = `
+    <div class="card"><h2>${esc(t("dataTitle"))}</h2><p class="insight">${esc(t("dataIntro"))}</p>
+      <ul class="list">
+        <li><span class="n">${esc(t("dataSince"))}</span><span class="m">${isFinite(first) ? esc(new Date(first * 1000).toLocaleString(LOC())) : "-"}</span></li>
+        <li><span class="n">${esc(t("dataChecks"))}</span><span class="m">${st.updated ? esc(new Date(st.updated * 1000).toLocaleString(LOC())) : "-"}</span></li>
+        <li><span class="n">${esc(t("dataSeed"))}</span><span class="m">${SEED_TS ? esc(new Date(SEED_TS * 1000).toLocaleString(LOC())) : esc(t("dataNoSeed"))}</span></li>
+        <li><span class="n">${esc(t("dataSize"))}</span><span class="m">${Math.round(bytes / 1024)} KB</span></li>
+      </ul></div>
+    <div class="card section"><h2>${esc(t("dlTitle"))}</h2>
+      <div class="btnrow"><button id="dlTop" ${D.players.length ? "" : "disabled"}>${esc(t("dlTop"))}</button><button id="dlCut" ${st.cutoffs.length ? "" : "disabled"}>${esc(t("dlCut"))}</button><button id="dlMine" ${D.me ? "" : "disabled"}>${esc(t("dlMine"))}</button></div>
+      <div class="note">${esc(t("exNote"))}</div></div>
+    <div class="card section"><h2>${esc(t("resetTitle"))}</h2><p class="insight">${esc(t("resetIntro"))}</p>
+      <div class="btnrow"><button id="resetData">${esc(t(RESET_ARMED ? "resetConfirm" : "resetBtn"))}</button></div><div class="msg" id="resetMsg" role="status"></div></div>`;
+  $("dlTop").addEventListener("click", () => download(`top250_${reg}.csv`, csv([["rank", "player", "rating", "wins", "losses", "win_rate", "last_match"],
+    ...D.players.map(p => [p[0], p[1], p[2], p[3], p[4], p[3] + p[4] ? (p[3] / (p[3] + p[4]) * 100).toFixed(1) : "", p[5] ? stamp(p[5]) : ""])])));
+  $("dlCut").addEventListener("click", () => download(`rating_cutoffs_${reg}.csv`, csv([["date", ...CUT_RANKS.map(r => "rank_" + r)], ...st.cutoffs.map(c => [stamp(c[0]), ...c.slice(1)])])));
+  $("dlMine").addEventListener("click", () => { if (!D.me) return;
+    download("my_games.csv", csv([["ended_utc", "map", "class", "result", "mode", "rating_change", "our_score", "their_score", "this_season"],
+      ...D.me.games.map(g => { const us = String(g.team || "").toLowerCase(), sc = g.scores || {}, th = us === "red" ? "blue" : "red";
+        return [g.ended, mapName(g.map_id), g.profession, g.result, g.rating_type, g.rating_change, sc[us], sc[th], !g.season || g.season === D.seasonId ? "yes" : "no"]; })])); });
+  $("resetData").addEventListener("click", () => {
+    if (!RESET_ARMED) { RESET_ARMED = true; renderArchive(); setTimeout(() => { if (RESET_ARMED) { RESET_ARMED = false; renderArchive(); } }, 5000); return; }
+    RESET_ARMED = false;
+    try { localStorage.removeItem(stateKey()); } catch (e) {}
+    ST = SEASON ? newState(SEASON.id) : null; SEED_TRIED = true; D = buildD(); refresh();
+    $("resetMsg").className = "msg good"; $("resetMsg").textContent = t("resetDone"); tickSoon();
+  });
+};
+
+$("region").addEventListener("change", e => {
+  REGION = e.target.value; store.set("region", REGION);
+  ST = loadState(); if (ST && SEASON && ST.season !== SEASON.id) ST = null;
+  SEED_TRIED = false; SEED_TS = null; D = buildD(); refresh(); tickSoon();
+});
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && (!ST || Date.now() / 1000 - (ST.updated || 0) > INTERVAL)) tickSoon();
+});
+
+// ---- boot
+ST = loadState();
+D = buildD();
+rebind();
+renderAll();
+tick();
+setInterval(() => { if (!document.hidden || !ST || Date.now() / 1000 - (ST.updated || 0) >= INTERVAL) tick(); }, INTERVAL * 1000);
+
+</script>
+</body>
+</html>
