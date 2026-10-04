@@ -1489,11 +1489,12 @@ async function api(path, key) {
   return r.json();
 }
 async function findSeason() {
-  const all = await api("/pvp/seasons?ids=all");
+  const all = await api("/pvp/seasons?ids=all&lang=en");   // names must be English: we match "rating"/"wins"/"losses"
   const act = (all || []).filter(s => s.active && s.leaderboards && s.leaderboards.ladder);
   if (!act.length) return null;
   const s = act[act.length - 1], ids = {};
   (s.leaderboards.ladder.scorings || []).forEach(sc => { if (sc && sc.name) ids[sc.name.toLowerCase()] = sc.id; });
+  if (!ids.rating || !ids.wins || !ids.losses) throw new Error("unexpected season format");
   return {id: s.id, name: s.name, start: s.start, end: s.end, rating: ids.rating, wins: ids.wins, losses: ids.losses};
 }
 async function fetchLadder(season) {
@@ -1515,7 +1516,8 @@ function newState(seasonId) {
   return {season: seasonId, region: REGION, players: {}, history: {}, results: {}, events: [], activity: {},
           hour_counts: {}, observed_hours: {}, cutoffs: [], updated: 0};
 }
-const stateKey = () => "gw2lw-state-" + REGION;
+const stateKey = () => "gw2lw-state2-" + REGION;
+try { ["na", "eu"].forEach(r => localStorage.removeItem("gw2lw-state-" + r)); } catch (e) {}   // drop data saved by the first web build
 function loadState() {
   try { const s = JSON.parse(localStorage.getItem(stateKey()) || "null"); if (s && s.players) return Object.assign(newState(s.season), s); } catch (e) {}
   return null;
