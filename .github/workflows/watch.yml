@@ -27,6 +27,8 @@ jobs:
           fi
 
       - name: Check NA and EU
+        env:
+          GW2_API_KEY: ${{ secrets.GW2_API_KEY }}
         run: python3 ci_check.py --dir data --regions na,eu
 
       - name: Save history

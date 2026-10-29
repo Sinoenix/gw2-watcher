@@ -2,7 +2,9 @@
 
 Loads public_snapshot_<region>.json from --dir, fetches the current top 250,
 applies the same logic as the PC program and writes the file back.
-No API keys and no personal data are involved.
+
+If the GW2_API_KEY secret is set, it also keeps the owner's own ranked games and
+rating in me.json (the key itself is never written anywhere).
 """
 import argparse
 import json
@@ -63,6 +65,37 @@ def load(path, season, region):
     return state, saved.get("updated")
 
 
+def update_me(dirpath, season):
+    """Saves the key owner's recent games and rating to me.json (GitHub secret GW2_API_KEY)."""
+    key = os.environ.get("GW2_API_KEY", "").strip()
+    if not key:
+        return
+    path = os.path.join(dirpath, "me.json")
+    store = {}
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                store = json.load(f)
+        except Exception:
+            store = {}
+    state = {"maps": store.pop("maps", {}) or {}}
+    store.pop("updated", None)
+    try:
+        fresh = w.fetch_player(state, store, key, season["id"])
+    except w.AuthError:
+        print("me: the API key was rejected (needs account + pvp)")
+        return
+    except Exception as e:
+        print(f"me: could not update ({e})")
+        return
+    store["maps"] = state["maps"]
+    store["updated"] = time.time()
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(store, f, separators=(",", ":"))
+    os.replace(path + ".tmp", path)
+    print(f"me: {store.get('account')} rating {store.get('rating')} ({len(fresh)} new games, {len(store['games'])} saved)")
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--dir", default="data")
@@ -104,6 +137,7 @@ def main():
         finally:
             os.chdir(cwd)
         print(f"{region}: {len(new)} players, {games} new games")
+    update_me(args.dir, season)
     return 1 if failed and failed == len(args.regions.split(",")) else 0
 
 

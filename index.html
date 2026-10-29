@@ -1602,6 +1602,22 @@ async function loadSeed() {
 }
 
 // ---- you + friends (API keys stay in this browser)
+// The site owner's games, saved around the clock by the server (me.json). Merged only into
+// the browser whose own key belongs to the same account.
+async function loadServerMe() {
+  if (!ME.account) return;
+  try {
+    const r = await fetch(`${DATA_BASE}me.json?t=${Math.floor(Date.now() / 60000)}`, {cache: "no-store"});
+    if (!r.ok) return;
+    const s = await r.json();
+    if (!s || s.account !== ME.account) return;
+    ME.games = Object.assign({}, s.games || {}, ME.games || {});
+    const pts = [...(s.ratings || []), ...(ME.ratings || [])].sort((a, b) => a[0] - b[0]);
+    ME.ratings = pts.filter((p, i) => i === 0 || p[1] !== pts[i - 1][1]).slice(-1500);
+    if (s.maps) Object.assign(MAPNAMES, s.maps);
+    if (ME.rating == null && s.rating != null) ME.rating = s.rating;
+  } catch (e) {}
+}
 async function fetchPlayer(st, key, seasonId) {
   st.games = st.games || {}; st.ratings = st.ratings || [];
   if (!st.account) st.account = (await api("/account", key)).name;
@@ -1665,6 +1681,7 @@ async function tick() {
     ERR = "";
     const key = KEY();
     if (key) {
+      await loadServerMe();
       try { await fetchPlayer(ME, key, SEASON.id); delete ME.error; }
       catch (e) { if (e instanceof AuthErr) ME.error = "key"; }
       store.set("meStore", ME);
